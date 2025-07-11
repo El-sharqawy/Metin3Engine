@@ -1,0 +1,135 @@
+{
+    "texture_count": 10,
+    "texture_set": [
+        {
+            "texture_id": 1,
+            "textures": {
+                "begin": 0,
+                "end": 0,
+                "filename": "resources/textureset/sand.jpg",
+                "is_splat": true,
+                "u_offset": 0.0,
+                "u_scale": 4.0,
+                "v_offset": 0.0,
+                "v_scale": 4.0
+            }
+        },
+        {
+            "texture_id": 2,
+            "textures": {
+                "begin": 0,
+                "end": 0,
+                "filename": "resources/textureset/rock.jpg",
+                "is_splat": true,
+                "u_offset": 0.0,
+                "u_scale": 4.0,
+                "v_offset": 0.0,
+                "v_scale": 4.0
+            }
+        },
+        {
+            "texture_id": 3,
+            "textures": {
+                "begin": 0,
+                "end": 0,
+                "filename": "resources/textureset/grass.png",
+                "is_splat": true,
+                "u_offset": 0.0,
+                "u_scale": 4.0,
+                "v_offset": 0.0,
+                "v_scale": 4.0
+            }
+        },
+        {
+            "texture_id": 4,
+            "textures": {
+                "begin": 0,
+                "end": 0,
+                "filename": "resources/textureset/snow.png",
+                "is_splat": true,
+                "u_offset": 0.0,
+                "u_scale": 4.0,
+                "v_offset": 0.0,
+                "v_scale": 4.0
+            }
+        },
+        {
+            "texture_id": 5,
+            "textures": {
+              "begin": 0,
+              "end": 0,
+              "filename": "resources/textureset/grass01.png",
+              "is_splat": true,
+              "u_offset": 0.0,
+              "u_scale": 4.0,
+              "v_offset": 0.0,
+              "v_scale": 4.0
+          }
+        },
+        {
+            "texture_id": 6,
+            "textures": {
+              "begin": 0,
+              "end": 0,
+              "filename": "resources/textureset/grass02.png",
+              "is_splat": true,
+              "u_offset": 0.0,
+              "u_scale": 4.0,
+              "v_offset": 0.0,
+              "v_scale": 4.0
+            }
+        },
+        {
+            "texture_id": 7,
+            "textures": {
+              "begin": 0,
+              "end": 0,
+              "filename": "resources/textureset/stone01.png",
+              "is_splat": true,
+              "u_offset": 0.0,
+              "u_scale": 4.0,
+              "v_offset": 0.0,
+              "v_scale": 4.0
+            }
+        },
+        {
+            "texture_id": 8,
+            "textures": {
+              "begin": 0,
+              "end": 0,
+              "filename": "resources/textureset/tile01.png",
+              "is_splat": true,
+              "u_offset": 0.0,
+              "u_scale": 4.0,
+              "v_offset": 0.0,
+              "v_scale": 4.0
+            }
+        },
+        {
+            "texture_id": 9,
+            "textures": {
+              "begin": 0,
+              "end": 0,
+              "filename": "resources/textureset/field01.png",
+              "is_splat": true,
+              "u_offset": 0.0,
+              "u_scale": 4.0,
+              "v_offset": 0.0,
+              "v_scale": 4.0
+            }
+        },
+        {
+            "texture_id": 10,
+            "textures": {
+              "begin": 0,
+              "end": 0,
+              "filename": "resources/textureset/field02.png",
+              "is_splat": true,
+              "u_offset": 0.0,
+              "u_scale": 4.0,
+              "v_offset": 0.0,
+              "v_scale": 4.0
+            }
+        }
+    ]
+}

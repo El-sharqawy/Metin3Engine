@@ -1,0 +1,8 @@
+#pragma once
+
+/* Application LOGS Definitions */
+//#define ENABLE_SHADERS_LOGS
+//#define ENABLE_MESH_LOGS
+//#define ENABLE_TEXTURE_LOGS
+//#define ENABLE_DYNAMIC_POOL_LOGS
+#define ENABLE_TERRAIN_MODIFICATIONS_LOGS

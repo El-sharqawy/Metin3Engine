@@ -1,0 +1,31 @@
+{
+    "texture_count": 2,
+    "texture_set": [
+        {
+            "texture_id": 1,
+            "textures": {
+                "begin": 0,
+                "end": 0,
+                "filename": "D:\\Metin3Engine\\UserInterface\\resources\\textureset\\grass01.png",
+                "is_splat": true,
+                "u_offset": 0.0,
+                "u_scale": 4.0,
+                "v_offset": 0.0,
+                "v_scale": 4.0
+            }
+        },
+        {
+            "texture_id": 2,
+            "textures": {
+                "begin": 0,
+                "end": 0,
+                "filename": "D:\\Metin3Engine\\UserInterface\\resources\\textureset\\stone01.png",
+                "is_splat": true,
+                "u_offset": 0.0,
+                "u_scale": 4.0,
+                "v_offset": 0.0,
+                "v_scale": 4.0
+            }
+        }
+    ]
+}
