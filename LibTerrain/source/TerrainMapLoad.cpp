@@ -4,6 +4,8 @@
 #include "ScopedTimer.h"
 #include <fstream>
 #include <mutex>
+#include "TerrainAreaData.h"
+#include "../../LibGame/source/ResourcesManager.h"
 
 #define USE_OPTIMIZED_TEXTURES_SETUP
 
@@ -11,8 +13,12 @@ bool CTerrainMap::LoadMap(const SVector3Df& v3PlayerPos)
 {
 	Destroy();
 
+	CTerrainVAO::Initialize();
+	CTerrainWaterVAO::Initialize();
+
 	// SetMap Name First
 	InitializeMapShaders();
+	InitializeMapWaterData();
 
 	std::string strSettingsFile = GetMapDirectoy() + "\\map_settings.json";
 	if (!LoadSettings(strSettingsFile))
@@ -34,16 +40,66 @@ void CTerrainMap::InitializeMapShaders()
 {
 	if (!m_pMapShader)
 	{
-		char c_szShaderName[256] = "Map Shader";
-		if (!GetMapName().empty())
+		try
 		{
-			sprintf_s(c_szShaderName, "%s Shader", GetMapName().c_str());
+			m_pMapShader = CResourcesManager::Instance().GetShader("TessellatedMapTerrain");
 		}
-		m_pMapShader = new CShader(c_szShaderName);
-		m_pMapShader->AttachShader("shaders/map_shader.vert");
-		m_pMapShader->AttachShader("shaders/map_shader.frag");
-		m_pMapShader->LinkPrograms();
+		catch (const std::exception& err)
+		{
+			sys_err("CTerrainMap::InitializeMapShaders: Failed to fetch Map Shader from Resources Manager Err: %s", err.what());
+
+			char c_szShaderName[256] = "Map Shader";
+			if (!GetMapName().empty())
+			{
+				sprintf_s(c_szShaderName, "%s Shader", GetMapName().c_str());
+			}
+			m_pMapShader = new CShader(c_szShaderName);
+			m_pMapShader->AttachShader("shaders/map_shader.vert");
+			m_pMapShader->AttachShader("shaders/map_shader.tcs");
+			m_pMapShader->AttachShader("shaders/map_shader.tes");
+			m_pMapShader->AttachShader("shaders/map_shader.frag");
+			m_pMapShader->LinkPrograms();
+		}
 	}
+}
+
+void CTerrainMap::InitializeMapWaterData()
+{
+	if (!m_pMapWaterShader)
+	{
+		try
+		{
+			m_pMapWaterShader = CResourcesManager::Instance().GetShader("MapWater");
+		}
+		catch (const std::exception& err)
+		{
+			sys_err("CTerrainMap::InitializeMapWaterData: Failed to fetch Map Water Shader from Resources Manager Err: %s", err.what());
+
+			char c_szWaterShaderName[256] = "Map Water Shader";
+			if (!GetMapName().empty())
+			{
+				sprintf_s(c_szWaterShaderName, "%s Water Shader", GetMapName().c_str());
+			}
+			m_pMapWaterShader = new CShader(c_szWaterShaderName);
+			m_pMapWaterShader->AttachShader("shaders/map_water_shader.vert");
+			m_pMapWaterShader->AttachShader("shaders/map_water_shader.frag");
+			m_pMapWaterShader->LinkPrograms();
+		}
+	}
+
+	m_pWaterDudvTex = new CTexture("resources/textures/waterDUDVMap.png", GL_TEXTURE_2D);
+	m_pWaterDudvTex->Load();
+	m_pWaterDudvTex->SetWrapping(GL_REPEAT, GL_REPEAT);
+
+	m_pWaterNormalTex = new CTexture("resources/textures/WaterNormalMap.png", GL_TEXTURE_2D);
+	m_pWaterNormalTex->Load();
+	m_pWaterNormalTex->SetWrapping(GL_REPEAT, GL_REPEAT);
+
+	m_pReflectionFBO = new CFrameBuffer();
+	m_pReflectionFBO->Init(1024, 1024);
+
+	m_pRefractionFBO = new CFrameBuffer();
+	m_pRefractionFBO->Init(1024, 1024);
 }
 
 bool CTerrainMap::LoadSettings(const std::string& stSettingsFile)
@@ -151,7 +207,7 @@ bool CTerrainMap::LoadTerrain(GLint iTerrainCoordX, GLint iTerrainCoordZ, GLint 
 	catch (const json::parse_error& e)
 	{
 		// logger.error("JSON parse error: {}", e.what());
-		sys_err("CTerrainMap::LoadTerrain: JSON parse error for File %s, error: %s", c_szTerrainData, e.what());
+		sys_err("CTerrainMap::LoadTerrain: (%d, %d) JSON parse error for File %s, error: %s", iTerrainCoordX, iTerrainCoordZ, c_szTerrainData, e.what());
 		return (false);
 	}
 
@@ -159,14 +215,14 @@ bool CTerrainMap::LoadTerrain(GLint iTerrainCoordX, GLint iTerrainCoordZ, GLint 
 	if (!jsonData.contains("script_type"))
 	{
 		// logger.error("Invalid texture file format");
-		sys_err("CTerrainMap::LoadTerrain: JSON parse error File %s, error: Failed to Load Script Type", c_szTerrainData);
+		sys_err("CTerrainMap::LoadTerrain: (%d, %d) JSON parse error File %s, error: Failed to Load Script Type", iTerrainCoordX, iTerrainCoordZ, c_szTerrainData);
 		return (false);
 	}
 
 	if (!jsonData.contains("terrain_name"))
 	{
 		// logger.error("Invalid texture file format");
-		sys_err("CTerrainMap::LoadTerrain: JSON parse error File %s, error: Failed to Load Terrain Name", c_szTerrainData);
+		sys_err("CTerrainMap::LoadTerrain: (%d, %d) JSON parse error File %s, error: Failed to Load Terrain Name", iTerrainCoordX, iTerrainCoordZ, c_szTerrainData);
 		return (false);
 	}
 
@@ -185,18 +241,71 @@ bool CTerrainMap::LoadTerrain(GLint iTerrainCoordX, GLint iTerrainCoordZ, GLint 
 	pTerrain->SetTerrainCoords(iTerrainCoordX, iTerrainCoordZ);
 	pTerrain->SetTerrainNumber(iTerrainNum);
 
-	char szRawHeightFileName[256 + 1];
-	_snprintf_s(szRawHeightFileName, sizeof(szRawHeightFileName), "%s\\%06d\\height.raw", GetMapDirectoy().c_str(), iTerrainID);
+	char szRawHeightMapFileName[64 + 1];
+	char szRawAttributeMapFileName[64 + 1];
+	char szRawSplatWeightMapFileName[64 + 1];
+	char szRawSplatIndexMapFileName[64 + 1];
+	char szRawWaterMapFileName[64 + 1];
 
-	pTerrain->LoadHeightMap(szRawHeightFileName);
+	_snprintf_s(szRawHeightMapFileName, sizeof(szRawHeightMapFileName), "%s\\%06d\\height.raw", GetMapDirectoy().c_str(), iTerrainID);
+	_snprintf_s(szRawAttributeMapFileName, sizeof(szRawAttributeMapFileName), "%s\\%06d\\attr.raw", GetMapDirectoy().c_str(), iTerrainID);
+	_snprintf_s(szRawSplatWeightMapFileName, sizeof(szRawSplatWeightMapFileName), "%s\\%06d\\splat_weight.raw", GetMapDirectoy().c_str(), iTerrainID);
+	_snprintf_s(szRawSplatIndexMapFileName, sizeof(szRawSplatIndexMapFileName), "%s\\%06d\\splat_index.raw", GetMapDirectoy().c_str(), iTerrainID);
+	_snprintf_s(szRawWaterMapFileName, sizeof(szRawWaterMapFileName), "%s\\%06d\\water.raw", GetMapDirectoy().c_str(), iTerrainID);
+
+	if (!pTerrain->LoadHeightMap(szRawHeightMapFileName))
+	{
+		sys_err("CTerrainMap::LoadTerrain: (%d, %d) Failed to Load HeightMap (%s)", iTerrainCoordX, iTerrainCoordZ, szRawHeightMapFileName);
+	}
+	if (!pTerrain->LoadAttributeMap(szRawAttributeMapFileName))
+	{
+		sys_err("CTerrainMap::LoadTerrain: (%d, %d) Failed to Load AttributeMap (%s)", iTerrainCoordX, iTerrainCoordZ, szRawAttributeMapFileName);
+	}
+	if (!pTerrain->LoadSplatMapWeight(szRawSplatWeightMapFileName))
+	{
+		sys_err("CTerrainMap::LoadTerrain: (%d, %d) Failed to Load SplatMap Weight (%s)", iTerrainCoordX, iTerrainCoordZ, szRawSplatWeightMapFileName);
+	}
+	if (!pTerrain->LoadSplatMapIndex(szRawSplatIndexMapFileName))
+	{
+		sys_err("CTerrainMap::LoadTerrain: (%d, %d) Failed to Load SplatMap Index (%s)", iTerrainCoordX, iTerrainCoordZ, szRawSplatIndexMapFileName);
+	}
+	if (!pTerrain->LoadWaterMap(szRawWaterMapFileName))
+	{
+		sys_err("CTerrainMap::LoadTerrain: (%d, %d) Failed to Load WaterMap (%s)", iTerrainCoordX, iTerrainCoordZ, szRawWaterMapFileName);
+	}
+
+	// Setup Base Texture (0)
+	pTerrain->SetupBaseTexture();
+
 	pTerrain->SetName(stTerrainName);
 	pTerrain->CalculateTerrainPatches();
 	pTerrain->SetReady(true);
-
+	
 	static std::mutex mtx;
 	std::unique_lock<std::mutex> lock(mtx);
 
 	m_vLoadedTerrains.push_back(pTerrain);
+
+	return (true);
+}
+
+bool CTerrainMap::LoadArea(GLint iAreaCoordX, GLint iAreaCoordZ, GLint iAreaNum)
+{
+	ScopedTimer timer("CTerrainMap::LoadArea");
+	GLint iAreaID = iAreaCoordX * 1000 + iAreaCoordZ;
+
+	char c_szAreaData[256];
+	sprintf_s(c_szAreaData, "%s\\%06d\\TerrainAreaData.json", GetMapDirectoy().c_str(), iAreaID);
+
+	CTerrainAreaData* pArea = CTerrainAreaData::New();
+	pArea->SetTerrainAreaDataMap(this);
+	pArea->SetAreaCoords(iAreaCoordX, iAreaCoordZ);
+	if (!pArea->LoadAreaObjectsFromFile(c_szAreaData))
+	{
+		sys_err("CTerrainMap::LoadArea: Failed to Load Area Objects from File for Area (%d, %d)", iAreaCoordX, iAreaCoordZ);
+	}
+
+	m_vLoadedAreas.push_back(pArea);
 
 	return (true);
 }
@@ -211,6 +320,24 @@ bool CTerrainMap::IsTerrainLoaded(GLint iTerrainCoordX, GLint iTerrainCoordZ)
 		pTerrain->GetTerrainCoords(&iCoordX, &iCoordZ);
 
 		if (iTerrainCoordX == iCoordX && iTerrainCoordZ == iCoordZ)
+		{
+			return (true);
+		}
+	}
+
+	return false;
+}
+
+// Check if given area X - Z is Loaded
+bool CTerrainMap::IsAreaLoaded(GLint iAreaCoordX, GLint iAreaCoordZ)
+{
+	for (size_t i = 0; i < m_vLoadedAreas.size(); i++)
+	{
+		CTerrainAreaData* pArea = m_vLoadedAreas[i];
+		GLint iCoordX, iCoordZ;
+		pArea->GetAreaCoords(&iCoordX, &iCoordZ);
+
+		if (iAreaCoordX == iCoordX && iAreaCoordZ == iCoordZ)
 		{
 			return (true);
 		}

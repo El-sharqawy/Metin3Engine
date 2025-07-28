@@ -8,7 +8,6 @@
 #include <stdexcept>
 
 #include "utils.h"
-#include "../../LibGL/source/utils.h"
 
 // Max Size for Grid
 #define MAX_SIZE 1 << 30
@@ -51,27 +50,15 @@ public:
 
 	T& operator [](GLint Index)
 	{
-#if defined(_DEBUG)
-		if (Index >= m_iGridSize)
+		static T s_DefaultValue{}; // or make it `const T` and return const&
+
+		if (Index < 0 || Index >= m_iGridSize || m_pGrid == nullptr)
 		{
-			throw std::out_of_range("Invalid Index");
+			fprintf(stderr, "Trying to access Invlid Index (%d)", Index);
+			return s_DefaultValue;
 		}
-#endif
 
 		return (m_pGrid[Index]);
-	}
-
-	// Initialize Grid With Value
-	void InitGrid(GLint Cols, GLint Rows, T InitValue)
-	{
-		InitGrid(Cols, Rows);
-
-		for (GLint i = 0; i < m_iGridSize; i++)
-		{
-			m_pGrid[i] = InitValue;
-		}
-
-		m_bIsInitialized = true;
 	}
 
 	// Initialize Grid
@@ -87,6 +74,18 @@ public:
 		m_pGrid = (T*)malloc(Cols * Rows * sizeof(T));
 
 		m_bIsInitialized = true;
+		//sys_log("CGrid::InitGrid Grid Data, Rows: %u, Cols: %u, GridSize: %u", m_iRows, m_iCols, m_iGridSize);
+	}
+
+	// Initialize Grid With Value
+	void InitGrid(GLint Cols, GLint Rows, T InitValue)
+	{
+		InitGrid(Cols, Rows);
+
+		for (GLint i = 0; i < m_iGridSize; i++)
+		{
+			m_pGrid[i] = InitValue;
+		}
 	}
 
 	// not sure how this gonna work, test it.
@@ -101,7 +100,7 @@ public:
 		m_pGrid = (T*)pData;
 
 		m_bIsInitialized = true;
-		sys_log("CGrid::InitGrid Grid Data, Rows: %u, Cols: %u, GridSize: %u", m_iRows, m_iCols, m_iGridSize);
+		//sys_log("CGrid::InitGrid Grid Data, Rows: %u, Cols: %u, GridSize: %u", m_iRows, m_iCols, m_iGridSize);
 	}
 
 	// is it really needed?
@@ -135,6 +134,11 @@ public:
 
 	T* GetAddr(GLint Col, GLint Row) const
 	{
+		if (Col >= m_iCols || Row >= m_iRows || Col < 0 || Row < 0)
+		{
+			return (GetAddr(0, 0));
+		}
+
 		size_t Index = CalculateIndex(Col, Row);
 		return &(m_pGrid[Index]);
 	}
@@ -171,12 +175,17 @@ public:
 		*GetAddr(Col, Row) = Value;
 	}
 
-	const T& Get(GLint Col, GLint Row) const
+	T& Get(GLint Col, GLint Row) const
 	{
+		if (Col >= m_iCols || Row >= m_iRows)
+		{
+			return (*GetAddr(0, 0));
+		}
+
 		return (*GetAddr(Col, Row));
 	}
 
-	const T& Get(GLint Index) const
+	T& Get(GLint Index) const
 	{
 #if defined(_DEBUG)
 		if (Index >= m_iGridSize)
@@ -251,32 +260,6 @@ public:
 		}
 	}
 
-	void PrintFloat()
-	{
-		for (GLint y = 0; y < m_iRows; y++)
-		{
-			printf("%d: ", y);
-			for (GLint x = 0; x < m_iCols; x++)
-			{
-				float f = (float)m_pGrid[y * m_iCols + x];
-				printf("%.6f", f);
-			}
-			printf("\n");
-		}
-	}
-
-	void PrintData()
-	{
-		if (IsInitialized())
-		{
-			sys_log("CGrid::PrintData: Rows: %d, Columns: %d, Size: %d, Name: %s", m_iRows, m_iCols, m_iGridSize, m_stGridName.c_str());
-		}
-		else
-		{
-			sys_err("CGrid::PrintData: Grid is not Initialized");
-		}
-	}
-
 	GLint GetWidth()
 	{
 		return (m_iCols);
@@ -300,6 +283,18 @@ public:
 	void SetName(const std::string& stName)
 	{
 		m_stGridName = stName;
+	}
+
+	// Returns a pointer to the underlying contiguous data buffer
+	T* data() noexcept
+	{
+		return m_pGrid;
+	}
+
+	// Const version
+	const T* data() const noexcept
+	{
+		return m_pGrid;
 	}
 
 private:

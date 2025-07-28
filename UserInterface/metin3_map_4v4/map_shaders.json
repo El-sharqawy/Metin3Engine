@@ -1,0 +1,34 @@
+{
+  "shaders": [
+    {
+      "name": "StandardInstancedModel",
+      "stages": {
+        "vertex": "shaders/model_shader.vert",
+        "fragment": "shaders/model_shader.frag"
+      }
+    },
+    {
+      "name": "TessellatedMapTerrain",
+      "stages": {
+        "vertex": "shaders/map_shader.vert",
+        "tess_control": "shaders/map_shader.tcs",
+        "tess_eval": "shaders/map_shader.tes",
+        "fragment": "shaders/map_shader.frag"
+      }
+    },
+    {
+      "name": "MapWater",
+      "stages": {
+        "vertex": "shaders/map_water_shader.vert",
+        "fragment": "shaders/map_water_shader.frag"
+      }
+    },
+    {
+      "name": "ScreenLines",
+      "stages": {
+        "vertex": "shaders/line_shader.vert",
+        "fragment": "shaders/line_shader.frag"
+      }
+    }
+  ]
+}

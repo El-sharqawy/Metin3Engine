@@ -60,7 +60,7 @@ public:
 	// Should be called once to load the texture
 	bool Load(bool bBindless = false);
 	void Load(GLuint uiBufferSize, void* pImageData);
-	void Load(const std::string& stFileName);
+	void Load(const std::string& stFileName, bool bBindless = false);
 
 	void LoadRaw(GLint iWidth, GLint iHeight, GLint iChannelsBPP, unsigned char* pImageData);
 

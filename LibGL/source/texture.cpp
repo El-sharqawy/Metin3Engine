@@ -1,5 +1,5 @@
 #include "stdafx.h"
-#include "texture.h"
+#include "Texture.h"
 
 CTexture::CTexture(GLenum eTargetTexture)
 {
@@ -83,6 +83,7 @@ bool CTexture::Load(bool bBindless)
 	{
 		LoadInternal(m_bImageData);
 	}
+
 	return true;
 }
 
@@ -93,7 +94,7 @@ void CTexture::Load(GLuint uiBufferSize, void* pImageData)
 	stbi_image_free(pImageLoadedData);
 }
 
-void CTexture::Load(const std::string& stFileName)
+void CTexture::Load(const std::string& stFileName, bool bBindless)
 {
 	m_strFullTexturePath = stFileName;
 	m_fsFilePath = stFileName;
@@ -105,7 +106,7 @@ void CTexture::Load(const std::string& stFileName)
 		}
 	}
 
-	if (!Load())
+	if (!Load(bBindless))
 	{
 		sys_err("CTexture::Load Failed to load texture: '%s'\n", stFileName.c_str());
 	}
@@ -354,22 +355,20 @@ GLuint CTexture::GenerateEmptyTexture2D(GLint iWidth, GLint iHeight, GLint iText
 	glGenTextures(1, &m_uiTextureID);
 	glBindTexture(m_eTextureTarget, m_uiTextureID);
 
-	if (iTextureType == GL_RGBA16UI)
+	if (iTextureType == GL_RGBA16UI || iTextureType == GL_RGBA32UI)
 	{
 		// Allocate with glTexStorage2D, upload with glTexSubImage2D (correct!)
-		glTexStorage2D(m_eTextureTarget, 1, GL_RGBA16UI, iWidth, iHeight);
-		glTexSubImage2D(m_eTextureTarget, 0, 0, 0, iWidth, iHeight, GL_RGBA_INTEGER, GL_UNSIGNED_INT, nullptr);
+		glTexStorage2D(m_eTextureTarget, 1, iTextureType, iWidth, iHeight);
 	}
 	else if (iTextureType == GL_RGBA8)
 	{
 		glTexStorage2D(m_eTextureTarget, 1, GL_RGBA8, iWidth, iHeight);
-		glTexSubImage2D(m_eTextureTarget, 0, 0, 0, iWidth, iHeight, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
 	}
 	else // assume float (e.g., GL_RGBA16F, GL_RGBA32F)
 	{
 		glTexStorage2D(m_eTextureTarget, 1, iTextureType, iWidth, iHeight);
-		glTexSubImage2D(m_eTextureTarget, 0, 0, 0, iWidth, iHeight, GL_RGBA, GL_FLOAT, nullptr);
 	}
+
 
 	glTexParameteri(m_eTextureTarget, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(m_eTextureTarget, GL_TEXTURE_MAG_FILTER, GL_NEAREST);

@@ -142,36 +142,32 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="source\base_shader.cpp" />
-    <ClCompile Include="source\camera.cpp" />
-    <ClCompile Include="source\frame_buffer.cpp" />
+    <ClCompile Include="source\BaseShader.cpp" />
+    <ClCompile Include="source\Camera.cpp" />
+    <ClCompile Include="source\FrameBuffer.cpp" />
     <ClCompile Include="source\glad.cpp" />
-    <ClCompile Include="source\mesh.cpp" />
-    <ClCompile Include="source\model.cpp" />
-    <ClCompile Include="source\screen.cpp" />
-    <ClCompile Include="source\shader.cpp" />
+    <ClCompile Include="source\Screen.cpp" />
+    <ClCompile Include="source\Shader.cpp" />
     <ClCompile Include="source\stb_image.cpp" />
     <ClCompile Include="source\stb_image_write.cpp" />
-    <ClCompile Include="source\stdafx.cpp" />
-    <ClCompile Include="source\texture.cpp" />
-    <ClCompile Include="source\utils.cpp" />
-    <ClCompile Include="source\window.cpp" />
+    <ClCompile Include="source\Stdafx.cpp" />
+    <ClCompile Include="source\Texture.cpp" />
+    <ClCompile Include="source\Utils.cpp" />
+    <ClCompile Include="source\Window.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="source\base_shader.h" />
-    <ClInclude Include="source\camera.h" />
-    <ClInclude Include="source\frame_buffer.h" />
-    <ClInclude Include="source\mesh.h" />
-    <ClInclude Include="source\model.h" />
-    <ClInclude Include="source\screen.h" />
-    <ClInclude Include="source\shader.h" />
-    <ClInclude Include="source\singleton.h" />
+    <ClInclude Include="source\BaseShader.h" />
+    <ClInclude Include="source\Camera.h" />
+    <ClInclude Include="source\FrameBuffer.h" />
+    <ClInclude Include="source\Screen.h" />
+    <ClInclude Include="source\Shader.h" />
+    <ClInclude Include="source\Singleton.h" />
     <ClInclude Include="source\stb_image.h" />
     <ClInclude Include="source\stb_image_write.h" />
-    <ClInclude Include="source\stdafx.h" />
-    <ClInclude Include="source\texture.h" />
-    <ClInclude Include="source\utils.h" />
-    <ClInclude Include="source\window.h" />
+    <ClInclude Include="source\Stdafx.h" />
+    <ClInclude Include="source\Texture.h" />
+    <ClInclude Include="source\Utils.h" />
+    <ClInclude Include="source\Window.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

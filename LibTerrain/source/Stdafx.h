@@ -9,6 +9,10 @@
 
 #define WIN32_LEAN_AND_MEAN             // Exclude rarely-used stuff from Windows headers
 
+#if defined(_WIN32) || defined(_WIN64)
+#include <windows.h>
+#endif
+
 // add headers that you want to pre-compile here
 #include <glad/glad.h>
 #include <fstream>

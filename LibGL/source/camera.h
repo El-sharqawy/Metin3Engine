@@ -92,13 +92,15 @@ public:
 	void UpdateBillBoardMatrix();
 	void UpdateViewVector();
 
+	void InvertCameraPitch();
+	void OnUpdate();
+
 protected:
 	void InitInternal();
 
 	void InitCamera(const SPersProjInfo& persProj, const SVector3Df& v3Pos, const SVector3Df& v3Target, const SVector3Df& v3Up);
 	void InitCamera(const SOrthoProjInfo& orthoProj, const SVector3Df& v3Pos, const SVector3Df& v3Target, const SVector3Df& v3Up);
 
-	void OnUpdate();
 
 
 private:
@@ -151,6 +153,7 @@ public:
 
 	void SetCurrentCamera(GLubyte CamNum);
 	CCamera* GetCurrentCamera();
+	CCamera& GetCurrentCameraRef();
 
 	GLubyte GetCurrentCameraNum();
 

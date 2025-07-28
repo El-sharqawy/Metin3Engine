@@ -2,7 +2,7 @@
 
 out vec4 FragColor;
 
-in vec2 TexCoords;
+in vec2 v2TexCoords;
 
 uniform vec2 v2Resolution;
 uniform mat4 m4Inv_proj;

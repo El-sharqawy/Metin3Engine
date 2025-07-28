@@ -132,9 +132,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="source\engine.cpp" />
+    <ClCompile Include="source\Engine.cpp" />
+    <ClCompile Include="source\Userinterface.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\LibGame\LibGame.vcxproj">
+      <Project>{96697466-fb22-4bc3-a07d-ddb7753faa8b}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\LibGL\LibGL.vcxproj">
       <Project>{81037902-32c9-4625-a588-b09e885646e6}</Project>
     </ProjectReference>
@@ -150,6 +154,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="source\CommonDefines.h" />
+    <ClInclude Include="source\Userinterface.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

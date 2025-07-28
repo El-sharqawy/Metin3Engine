@@ -10,7 +10,6 @@ GLuint CScreen::m_iVBO; // Vertex Buffer Object
 GLuint CScreen::m_iIdxBuf; // Index Buffer
 GLint CScreen::m_iVertexCapacity;
 
-std::unique_ptr<CShader> CScreen::m_pLineShader;
 GLboolean CScreen::m_bIsInitialized;
 SVector4Df CScreen::m_v4DiffColor;
 
@@ -24,6 +23,7 @@ CRay CScreen::ms_Ray;
 SVector3Df CScreen::ms_v3PickRayOrigin;
 SVector3Df CScreen::ms_v3PickRayDir;
 SVector3Df CScreen::ms_v3IntersectionPoint;
+SVector3Df CScreen::ms_v3EditingCenterPoint;
 
 /*
  * - Always Remember, Y is for the Vertical Axis not Z.
@@ -33,7 +33,7 @@ CScreen::CScreen(GLint iVerticesNum)
 	m_bIsInitialized = true;
 	m_iVertexCapacity = iVerticesNum;
 
-	m_pLineShader = std::make_unique<CShader>("LineShader");
+	m_pLineShader = nullptr;
 
 	glGenVertexArrays(1, &m_iVAO);
 	glBindVertexArray(m_iVAO);
@@ -62,10 +62,6 @@ CScreen::CScreen(GLint iVerticesNum)
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindVertexArray(0);
 
-	// TODO: Initialize shaderProgram with a basic line shader
-	m_pLineShader->AttachShader("shaders/line_shader.vert");
-	m_pLineShader->AttachShader("shaders/line_shader.frag");
-	m_pLineShader->LinkPrograms();
 	m_v4DiffColor = SVector4Df(0.0f, 1.0f, 0.0f, 1.0f);
 	m_iVertexCapacity = 1;
 	m_matView = CCameraManager::Instance().GetCurrentCamera()->GetViewMatrix();
@@ -83,7 +79,7 @@ void CScreen::Init()
 {
 	if (!m_bIsInitialized)
 	{
-		m_pLineShader = std::make_unique<CShader>("LineShader");
+		m_pLineShader = nullptr;
 
 		glGenVertexArrays(1, &m_iVAO);
 		glBindVertexArray(m_iVAO);
@@ -111,11 +107,6 @@ void CScreen::Init()
 
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 		glBindVertexArray(0);
-
-		// TODO: Initialize shaderProgram with a basic line shader
-		m_pLineShader->AttachShader("shaders/line_shader.vert");
-		m_pLineShader->AttachShader("shaders/line_shader.frag");
-		m_pLineShader->LinkPrograms();
 	}
 }
 
@@ -508,6 +499,24 @@ void CScreen::RenderSquare3d(float sx, float sy, float sz, float ex, float ey, f
 	glEnable(GL_CULL_FACE);
 }
 
+void CScreen::RenderPieceLine(GLfloat fxStart, GLfloat fzStart, GLfloat fxEnd, GLfloat fzEnd, GLint iStep)
+{
+	GLfloat fxStep = (fxEnd - fxStart) / static_cast<GLfloat>(iStep);
+	GLfloat fzStep = (fzEnd - fzStart) / static_cast<GLfloat>(iStep);
+
+	for (GLint i = 0; i < iStep; i++)
+	{
+		GLfloat fX = fxStart + i * fxStep;
+		GLfloat fZ = fzStart + i * fzStep;
+
+		CTerrainMap& pOutdoor = m_pTerrainManager->GetMapRef();
+		GLfloat fCurHeight = pOutdoor.GetHeight(fX, fZ) + 0.1f;
+		GLfloat fNextHeight = pOutdoor.GetHeight(fX + fxStep, fZ + fzStep) + 0.1f;
+		RenderLine3d(fX, fCurHeight, fZ, fX + fxStep, fNextHeight, (fZ + fzStep));
+
+	}
+}
+
 void CScreen::UpdateVertexBuffer(const TScreenVertex* vertices, size_t vertexCount)
 {
 	if (vertexCount > m_iVertexCapacity)
@@ -628,6 +637,11 @@ bool CScreen::GetCursorPosition(SVector3Df* v3Pos)
 
 void CScreen::Update()
 {
+	if (!m_pLineShader)
+	{
+		m_pLineShader = CResourcesManager::Instance().GetShader("ScreenLines");
+	}
+
 	SVector4Df v4PickingPointColor{ 0.0f, 1.0f, 1.0f, 1.0f };
 
 	GLfloat fCellScale = static_cast<GLfloat>(CELL_SCALE_METER);
@@ -643,7 +657,17 @@ void CScreen::Update()
 		ms_v3IntersectionPoint.x, ms_v3IntersectionPoint.y - fCellScale, ms_v3IntersectionPoint.z,
 		ms_v3IntersectionPoint.x, ms_v3IntersectionPoint.y + fCellScale, ms_v3IntersectionPoint.z);
 
-	RenderTerrainEditingArea();
+	if (m_pTerrainManager->IsEditing())
+	{
+		if (m_pTerrainManager->IsEditingHeight() || m_pTerrainManager->IsEditingTexture() || m_pTerrainManager->IsEditingAttribute())
+		{
+			RenderTerrainEditingArea();
+		}
+		else if (m_pTerrainManager->IsEditingWater())
+		{
+			RenderWaterEditingArea();
+		}
+	}
 }
 
 void CScreen::RenderTerrainEditingArea()
@@ -659,26 +683,28 @@ void CScreen::RenderTerrainEditingArea()
 
 	GLfloat fX, fY, fZ, fLeft, fRight, fTop, fBottom;
 
-	fX = static_cast<GLfloat>(iEditX * CELL_SCALE_METER + iEditTerrainNumX * XSIZE * CELL_SCALE_METER);
-	fZ = static_cast<GLfloat>(iEditZ * CELL_SCALE_METER + iEditTerrainNumZ * ZSIZE * CELL_SCALE_METER);
+	fX = static_cast<GLfloat>(iEditX * CELL_SCALE_METER + iEditTerrainNumX * TERRAIN_XSIZE);
+	fZ = static_cast<GLfloat>(iEditZ * CELL_SCALE_METER + iEditTerrainNumZ * TERRAIN_ZSIZE);
 
 	// Get reference to outdoor map
 	CTerrainMap& pOutdoor = m_pTerrainManager->GetMapRef();
 
 	fY = pOutdoor.GetHeight(fX, fZ) + 0.1f;
 
-	pOutdoor.GetShaderRef().Use();
-	pOutdoor.GetShaderRef().setVec3("u_HitPosition", fX, fY, fZ);
-	pOutdoor.GetShaderRef().setInt("u_HitRadius", iBrushSize);
-	pOutdoor.GetShaderRef().setBool("u_HasHit", true);				// enable hit visualization
+	pOutdoor.GetTerrainShaderRef().Use();
+	pOutdoor.GetTerrainShaderRef().setVec3("u_HitPosition", fX, fY, fZ);
+	pOutdoor.GetTerrainShaderRef().setInt("u_HitRadius", iBrushSize);
+	pOutdoor.GetTerrainShaderRef().setBool("u_HasHit", true);				// enable hit visualization
 
-	fLeft = static_cast<GLfloat>((iEditX - iBrushSize) * CELL_SCALE_METER + iEditTerrainNumX * XSIZE * CELL_SCALE_METER);
-	fRight = static_cast<GLfloat>((iEditX + iBrushSize) * CELL_SCALE_METER + iEditTerrainNumX * XSIZE * CELL_SCALE_METER);
-	fTop = static_cast<GLfloat>((iEditZ - iBrushSize) * CELL_SCALE_METER + iEditTerrainNumZ * ZSIZE * CELL_SCALE_METER);
-	fBottom = static_cast<GLfloat>((iEditZ + iBrushSize) * CELL_SCALE_METER + iEditTerrainNumZ * ZSIZE * CELL_SCALE_METER);
+	fLeft = static_cast<GLfloat>((iEditX - iBrushSize) * CELL_SCALE_METER + iEditTerrainNumX * TERRAIN_XSIZE);
+	fRight = static_cast<GLfloat>((iEditX + iBrushSize) * CELL_SCALE_METER + iEditTerrainNumX * TERRAIN_XSIZE);
+	fTop = static_cast<GLfloat>((iEditZ - iBrushSize) * CELL_SCALE_METER + iEditTerrainNumZ * TERRAIN_ZSIZE);
+	fBottom = static_cast<GLfloat>((iEditZ + iBrushSize) * CELL_SCALE_METER + iEditTerrainNumZ * TERRAIN_ZSIZE);
 
 	SVector4Df v4EditingCenterColor{ 1.0f, 0.0f, 0.0f, 1.0f };
 	SetDiffuseColor(v4EditingCenterColor);
+
+	ms_v3EditingCenterPoint = SVector3Df(fX, fY, fZ);
 
 	RenderLine3d(fX - 1.0f, fY, fZ, fX + 1.0f, fY, fZ);
 	RenderLine3d(fX, fY - 1.0f, fZ, fX, fY + 1.0f, fZ);
@@ -689,6 +715,10 @@ void CScreen::RenderTerrainEditingArea()
 	{
 		GLfloat fRadius = static_cast<GLfloat>(iBrushSize * CELL_SCALE_METER);
 		RenderTerrainCursorCircle(fX, fY, fZ, fRadius, 64);
+	}
+	else if (bBrushShape == BRUSH_SHAPE_SQUARE)
+	{
+		RenderTerrainCursorSquare(fLeft, fTop, fRight, fBottom, iBrushSize * 2);
 	}
 }
 
@@ -724,6 +754,86 @@ void CScreen::RenderTerrainCursorCircle(GLfloat fx, GLfloat fy, GLfloat fz, GLfl
 	RenderLine3d(pts[iStep - 1], pts[0]);
 }
 
+void CScreen::RenderTerrainCursorSquare(GLfloat fxStart, GLfloat fzStart, GLfloat fxEnd, GLfloat fzEnd, GLint iStep)
+{
+	SetDiffuseColor(0.0f, 1.0f, 0.0f, 1.0f);
+	
+	RenderPieceLine(fxStart, fzStart, fxEnd, fzStart, iStep);
+	RenderPieceLine(fxStart, fzEnd, fxEnd, fzEnd, iStep);
+	RenderPieceLine(fxStart, fzStart, fxStart, fzEnd, iStep);
+	RenderPieceLine(fxEnd, fzStart, fxEnd, fzEnd, iStep);
+}
+
+void CScreen::RenderWaterEditingArea()
+{
+	assert(m_pTerrainManager);
+
+	GLint iEditX, iEditZ, iSubCellX, iSubCellZ, iEditTerrainNumX, iEditTerrainNumZ;
+
+	m_pTerrainManager->GetEditingData(&iEditX, &iEditZ, &iSubCellX, &iSubCellZ, &iEditTerrainNumX, &iEditTerrainNumZ);
+
+	GLint iBrushSize = m_pTerrainManager->GetBrushSize();
+	GLbyte bBrushShape = m_pTerrainManager->GetBrushShape();
+
+	GLfloat brushCenterX = static_cast<GLfloat>((iEditX + iSubCellX / HEIGHT_WATER_XRATIO) * CELL_SCALE_METER + iEditTerrainNumX * TERRAIN_XSIZE);
+	GLfloat brushCenterZ = static_cast<GLfloat>((iEditZ + iSubCellZ / HEIGHT_WATER_ZRATIO) * CELL_SCALE_METER + iEditTerrainNumZ * TERRAIN_ZSIZE);
+
+	GLfloat fX = brushCenterX;
+	GLfloat fZ = brushCenterZ;
+	GLfloat fY = static_cast<GLfloat>(m_pTerrainManager->GetWaterBrushHeight());
+
+	GLfloat fRadius = static_cast<GLfloat>(iBrushSize * CELL_SCALE_METER); // scale it properly
+
+	GLfloat fLeft = brushCenterX - fRadius;
+	GLfloat fRight = brushCenterX + fRadius;
+	GLfloat fTop = brushCenterZ - fRadius;
+	GLfloat fBottom = brushCenterZ + fRadius;
+
+	// Get reference to outdoor map
+	CTerrainMap& pOutdoor = m_pTerrainManager->GetMapRef();
+
+	SetDiffuseColor(0.0f, 0.3f, 1.0f, 1.0f);
+
+	RenderLine3d(fX - 3.0f, fY, fZ, fX + 3.0f, fY, fZ);
+	RenderLine3d(fX, fY - 3.0f, fZ, fX, fY + 3.0f, fZ);
+	RenderLine3d(fX, fY, fZ - 3.0f, fX, fY, fZ + 3.0f);
+
+	RenderLine3d(fLeft, fY, fTop, fLeft, fY, fBottom);
+	RenderLine3d(fRight, fY, fTop, fRight, fY, fBottom);
+	RenderLine3d(fLeft, fY, fTop, fRight, fY, fTop);
+	RenderLine3d(fLeft, fY, fBottom, fRight, fY, fBottom);
+
+	GLfloat fTheta, fDelta;
+	GLfloat x, y, z;
+	std::vector<SVector3Df> pts;
+	//GLfloat fRadius = static_cast<GLfloat>(iBrushSize * CELL_SCALE_METER);
+	GLint iStep = 50; // Number of segments for the circle
+
+	pts.clear();
+	pts.resize(iStep);
+
+	fTheta = 0.0f;
+	fDelta = 2.0f * static_cast<GLfloat>(M_PI) / static_cast<GLfloat>(iStep);
+
+	for (GLint iCount = 0; iCount < iStep; iCount++)
+	{
+		x = fX + fRadius * std::cosf(fTheta);
+		y = fY;
+		z = fZ + fRadius * std::sinf(fTheta);
+
+		pts[iCount] = SVector3Df(x, y, z);
+
+		fTheta += fDelta;
+	}
+
+	for (GLint iCount = 0; iCount < iStep - 1; iCount++)
+	{
+		RenderLine3d(pts[iCount], pts[iCount + 1]);
+	}
+
+	RenderLine3d(pts[iStep - 1], pts[0]);
+}
+
 void CScreen::SetTerrainManager(CTerrainManager* pTerrainManager)
 {
 	m_pTerrainManager = pTerrainManager;
@@ -732,6 +842,11 @@ void CScreen::SetTerrainManager(CTerrainManager* pTerrainManager)
 SVector3Df& CScreen::GetIntersectionPoint()
 {
 	return (ms_v3IntersectionPoint);
+}
+
+SVector3Df& CScreen::GetEditingCenterPoint()
+{
+	return (ms_v3EditingCenterPoint);
 }
 
 bool CScreen::GetCursorPosition(float* px, float* py, float* pz)

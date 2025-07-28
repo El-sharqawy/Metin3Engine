@@ -64,6 +64,8 @@ bool CTerrainManager::LoadMap(const std::string& stMapName)
 	m_pTerrainMap->SetMapReady(false);
 	m_pTerrainMap->SetMapName(stMapName);
 
+	CResourcesManager::Instance().LoadShaderDefinitions(stMapName + "\\map_shaders.json");
+
 	if (!m_pTerrainMap->LoadMap(0.0f))
 	{
 		sys_err("CTerrainManager::LoadMap: Failed to Load The Map %s", stMapName.c_str());
@@ -89,6 +91,20 @@ bool CTerrainManager::LoadMap(const std::string& stMapName, const SVector3Df& v3
 	}
 
 	m_pTerrainMap->SetMapReady(true);
+	return (true);
+}
+
+bool CTerrainManager::UnLoadMap(const std::string& stMapName)
+{
+	CTerrainMap& rTerrainMap = GetTerrainMapRef();
+	if (stMapName != rTerrainMap.GetMapName() && "" != rTerrainMap.GetMapName())
+	{
+		sys_err("CTerrainManager::UnLoadMap: Unload Map %s Failed", stMapName.c_str());
+		return false;
+
+	}
+
+	Clear();
 	return (true);
 }
 

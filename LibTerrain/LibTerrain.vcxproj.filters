@@ -36,13 +36,22 @@
     <ClInclude Include="source\TerrainPatch.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="source\TerrainVao.h">
+    <ClInclude Include="source\TerrainVAO.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="source\ScopedTimer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="source\TerrainManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="source\TerrainAreaObjects.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="source\TerrainAreaData.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="source\TerrainWater.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -62,7 +71,7 @@
     <ClCompile Include="source\TerrainMap.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="source\TerrainMapFuncs.cpp">
+    <ClCompile Include="source\TerrainMapAccessors.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="source\TerrainMapLoad.cpp">
@@ -72,6 +81,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="source\TerrainManagerEditor.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="source\TerrainAreaData.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

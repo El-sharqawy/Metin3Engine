@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "vectors.h"
 #include "glm/gtc/matrix_transform.hpp"
+#include "../../LibGL/source/utils.h"
 
 /**
  * Constructs an SVector2Di object with both x and y components initialized to the same value.
@@ -2204,6 +2205,15 @@ SVector4Df::SVector4Df(const float _x, const float _y, const float _z, const flo
 	w = _w;
 }
 
+SVector4Df::SVector4Df(const int32_t _x, const int32_t _y, const int32_t _z, const int32_t _w)
+{
+	x = static_cast<float>(_x);
+	y = static_cast<float>(_y);
+	z = static_cast<float>(_z);
+	w = static_cast<float>(_w);
+
+}
+
 /**
  * SVector4Df constructor that initializes from a std::array, with optional safety checks.
  *
@@ -2578,4 +2588,811 @@ SVector4Df operator/(const SVector4Df& vec1, const SVector4Df& vec2)
 	SVector4Df Result(vec1.x / vec2.x, vec1.y / vec2.y, vec1.z / vec2.z, vec1.w / vec2.w);
 	return (Result);
 
+}
+
+/************************************************************************************************/
+/************************************************************************************************/
+/************************************************************************************************/
+/************************************************************************************************/
+/************************************************************************************************/
+
+/**
+ * SVector4Di constructor that initializes all components to a single value.
+ *
+ * @param fVal The value to initialize all components to.
+ */
+SVector4Di::SVector4Di(const float fVal)
+{
+	x = y = z = w = static_cast<int32_t>(fVal);
+}
+
+/**
+ * SVector4Di constructor that initializes all components to a single value.
+ *
+ * @param fVal The value to initialize all components to.
+ */
+SVector4Di::SVector4Di(const int32_t iVal)
+{
+	x = y = z = w = iVal;
+}
+
+/**
+ * SVector4Di constructor that initializes each component with a separate value.
+ *
+ * @param _x The value for the x component.
+ * @param _y The value for the y component.
+ * @param _z The value for the z component.
+ * @param _w The value for the w component. (scalar)
+ */
+SVector4Di::SVector4Di(const float _x, const float _y, const float _z, const float _w)
+{
+	x = static_cast<int32_t>(_x);
+	y = static_cast<int32_t>(_y);
+	z = static_cast<int32_t>(_z);
+	w = static_cast<int32_t>(_w);
+}
+
+/**
+ * SVector4Di constructor that initializes each component with a separate value.
+ *
+ * @param _x The value for the x component.
+ * @param _y The value for the y component.
+ * @param _z The value for the z component.
+ * @param _w The value for the w component. (scalar)
+ */
+SVector4Di::SVector4Di(const int32_t _x, const int32_t _y, const int32_t _z, const int32_t _w)
+{
+	x = _x;
+	y = _y;
+	z = _z;
+	w = _w;
+}
+
+/**
+ * SVector4Di constructor that initializes from a std::array, with optional safety checks.
+ *
+ * If `bSafety` is true, the constructor uses `arr.at(i)` for bounds checking.
+ * Otherwise, it assumes valid indexing and uses `arr[i]`.
+ *
+ * @param arr The std::array to copy from.
+ * @param bSafety Flag to enable bounds checking.
+ */
+SVector4Di::SVector4Di(const std::array<float, 4>& arr, bool bSafety)
+{
+	if (!bSafety)
+	{
+		x = static_cast<int32_t>(arr[0]);
+		y = static_cast<int32_t>(arr[1]);
+		z = static_cast<int32_t>(arr[2]);
+		w = static_cast<int32_t>(arr[3]);
+	}
+	else
+	{
+		x = static_cast<int32_t>(arr.at(0));
+		y = static_cast<int32_t>(arr.at(1));
+		z = static_cast<int32_t>(arr.at(2));
+		w = static_cast<int32_t>(arr.at(3));
+	}
+}
+
+/**
+ * SVector4Di constructor that initializes from a std::array, with optional safety checks.
+ *
+ * If `bSafety` is true, the constructor uses `arr.at(i)` for bounds checking.
+ * Otherwise, it assumes valid indexing and uses `arr[i]`.
+ *
+ * @param arr The std::array to copy from.
+ * @param bSafety Flag to enable bounds checking.
+ */
+SVector4Di::SVector4Di(const std::array<int32_t, 4>& arr, bool bSafety)
+{
+	if (!bSafety)
+	{
+		x = arr[0];
+		y = arr[1];
+		z = arr[2];
+		w = arr[3];
+	}
+	else
+	{
+		x = arr.at(0);
+		y = arr.at(1);
+		z = arr.at(2);
+		w = arr.at(3);
+	}
+}
+
+/**
+ * SVector4Di constructor that initializes from a raw float pointer.
+ *
+ * If the pointer is null, all components are set to zero.
+ *
+ * @param pVec The pointer to a float array (length 4).
+ */
+SVector4Di::SVector4Di(const float* pVec)
+{
+	if (!pVec)
+	{
+		x = y = z = w = 0;
+		return;
+	}
+
+	x = static_cast<int32_t>(pVec[0]);
+	y = static_cast<int32_t>(pVec[1]);
+	z = static_cast<int32_t>(pVec[2]);
+	w = static_cast<int32_t>(pVec[3]);
+}
+
+/**
+ * SVector4Di constructor that initializes from a raw integer pointer.
+ *
+ * If the pointer is null, all components are set to zero.
+ *
+ * @param pVec The pointer to a float array (length 4).
+ */
+SVector4Di::SVector4Di(const int32_t* pVec)
+{
+	if (!pVec)
+	{
+		x = y = z = w = 0;
+		return;
+	}
+
+	x = pVec[0];
+	y = pVec[1];
+	z = pVec[2];
+	w = pVec[3];
+}
+
+/**
+ * SVector4Di constructor that initializes from an SVector2Df and two additional values.
+ *
+ * @param vec The SVector2Df object to copy from.
+ * @param _z The value for the z component.
+ * @param _w The value for the w component.
+ */
+SVector4Di::SVector4Di(const SVector2Df& vec, const float _z, const float _w)
+{
+	x = static_cast<int32_t>(vec.x);
+	y = static_cast<int32_t>(vec.y);
+	z = static_cast<int32_t>(_z);
+	w = static_cast<int32_t>(_w);
+}
+
+/**
+ * SVector4Di constructor that initializes from an SVector2Di and two additional values.
+ *
+ * @param vec The SVector2Di object to copy from.
+ * @param _z The value for the z component.
+ * @param _w The value for the w component.
+ */
+SVector4Di::SVector4Di(const SVector2Di& vec, const int32_t _z, const int32_t _w)
+{
+	x = vec.x;
+	y = vec.y;
+	z = _z;
+	w = _w;
+}
+
+/**
+ * SVector4Di constructor that initializes from an SVector3Df and one additional value.
+ *
+ * @param vec The SVector3Df object to copy from.
+ * @param _w The value for the w component.
+ */
+SVector4Di::SVector4Di(const SVector3Df& vec, const float _w)
+{
+	x = static_cast<int32_t>(vec.x);
+	y = static_cast<int32_t>(vec.y);
+	z = static_cast<int32_t>(vec.z);
+	w = static_cast<int32_t>(_w);
+}
+
+/**
+ * SVector4Di constructor that initializes from an SVector3Di and one additional value.
+ *
+ * @param vec The SVector3Di object to copy from.
+ * @param _w The value for the w component.
+ */
+SVector4Di::SVector4Di(const SVector3Di& vec, const int32_t _w)
+{
+	x = vec.x;
+	y = vec.y;
+	z = vec.z;
+	w = _w;
+}
+
+/**
+ * SVector4Di constructor that initializes from a glm::vec3 and a scalar value.
+ *
+ * @param vec The glm::vec3 object to copy from.
+ * @param _w The value for the w component.
+ */
+SVector4Di::SVector4Di(const glm::vec3& vec, const float _w)
+{
+	x = static_cast<int32_t>(vec.x);
+	y = static_cast<int32_t>(vec.y);
+	z = static_cast<int32_t>(vec.z);
+	w = static_cast<int32_t>(_w);
+}
+
+/**
+ * SVector4Di constructor that initializes from a glm::vec3 and a scalar value.
+ *
+ * @param vec The glm::vec3 object to copy from.
+ * @param _w The value for the w component.
+ */
+SVector4Di::SVector4Di(const glm::ivec3& vec, const int32_t _w)
+{
+	x = vec.x;
+	y = vec.y;
+	z = vec.z;
+	w = _w;
+}
+
+/**
+ * SVector4Di copy constructor.
+ *
+ * @param vec The SVector4Df object to copy.
+ */
+SVector4Di::SVector4Di(const SVector4Df& vec)
+{
+	x = static_cast<int32_t>(vec.x);
+	y = static_cast<int32_t>(vec.y);
+	z = static_cast<int32_t>(vec.z);
+	w = static_cast<int32_t>(vec.w);
+}
+
+/**
+ * SVector4Di copy constructor.
+ *
+ * @param vec The SVector4Di object to copy.
+ */
+SVector4Di::SVector4Di(const SVector4Di& vec)
+{
+	x = vec.x;
+	y = vec.y;
+	z = vec.z;
+	w = vec.w;
+}
+
+/**
+ * SVector4Di constructor that initializes from a glm::vec4 object.
+ *
+ * @param vec The glm::vec4 object to copy from.
+ */
+SVector4Di::SVector4Di(const glm::vec4& vec)
+{
+	x = static_cast<int32_t>(vec.x);
+	y = static_cast<int32_t>(vec.y);
+	z = static_cast<int32_t>(vec.z);
+	w = static_cast<int32_t>(vec.w);
+}
+
+/**
+ * SVector4Di constructor that initializes from a glm::ivec4 object.
+ *
+ * @param vec The glm::ivec4 object to copy from.
+ */
+SVector4Di::SVector4Di(const glm::ivec4& vec)
+{
+	x = vec.x;
+	y = vec.y;
+	z = vec.z;
+	w = vec.w;
+}
+
+/**
+ * Compares SVector4Di with SVector4Df objects for equality.
+ *
+ * @param vec The SVector4Df object to compare to.
+ * @return true if the two objects are equal, false otherwise.
+ */
+bool SVector4Di::operator == (const SVector4Df& vec)
+{
+	int32_t ix = static_cast<int32_t>(vec.x);
+	int32_t iy = static_cast<int32_t>(vec.y);
+	int32_t iz = static_cast<int32_t>(vec.z);
+	int32_t iw = static_cast<int32_t>(vec.w);
+	return (x == ix && y == iy && z == iz && w == iw);
+}
+
+/**
+ * Compares two SVector4Di objects for equality.
+ *
+ * @param vec The SVector4Di object to compare to.
+ * @return true if the two objects are equal, false otherwise.
+ */
+bool SVector4Di::operator == (const SVector4Di& vec)
+{
+	return (x == vec.x && y == vec.y && z == vec.z && w == vec.w);
+}
+
+/**
+ * Compares SVector4Di with SVector4Df objects for inequality.
+ *
+ * @param vec The SVector4Df object to compare to.
+ * @return true if the two objects are not equal, false otherwise.
+ */
+bool SVector4Di::operator != (const SVector4Df& vec)
+{
+	return (!(*this == vec));
+}
+
+/**
+	 * Compares two SVector4Di objects for inequality.
+ *
+ * @param vec The SVector4Df object to compare to.
+ * @return true if the two objects are not equal, false otherwise.
+ */
+bool SVector4Di::operator != (const SVector4Di& vec)
+{
+	return (!(*this == vec));
+}
+
+/**
+ * Provides a const pointer to the underlying float array.
+ *
+ * This allows direct access to the x, y, z, and w components as a float array.
+ *
+ * @return A const pointer to the float array.
+ */
+SVector4Di::operator const int32_t* () const
+{
+	return (&(x));
+}
+
+/**
+ * Prints the x, y, z, and w components of the SVector4Di object to the console.
+ *
+ * @param bEndl If true, a newline character is printed after the values.
+ */
+void SVector4Di::print(bool bEndl) const
+{
+	printf("(%d, %d, %d, %d)", x, y, z, w);
+	if (bEndl)
+	{
+		printf("\n");
+	}
+}
+
+/**
+ * Calculates the length (magnitude) of the SVector4Di object.
+ *
+ * @return The length of the vector.
+ */
+float SVector4Di::length() const
+{
+	GLfloat fX = static_cast<GLfloat>(x);
+	GLfloat fY = static_cast<GLfloat>(y);
+	GLfloat fZ = static_cast<GLfloat>(z);
+	GLfloat fW = static_cast<GLfloat>(w);
+
+	float fLen = sqrtf(fX * fX + fY * fY + fZ * fZ + fW * fW);
+	return (fLen);
+}
+
+/**
+ * Normalizes the SVector4Di object, making its length 1.
+ *
+ * @return A reference to this modified SVector4Di object.
+ * @throws std::domain_error If the vector is zero.
+ */
+SVector4Di& SVector4Di::normalize()
+{
+	float fLen = length();
+	assert(fLen != 0.0f);
+	x /= static_cast<int32_t>(fLen);
+	y /= static_cast<int32_t>(fLen);
+	z /= static_cast<int32_t>(fLen);
+	w /= static_cast<int32_t>(fLen);
+	return (*this);
+}
+
+/**
+ * Calculates the dot product of SVector4Di with SVector4Df object.
+ *
+ * @param vec The SVector4Df object to calculate the dot product with.
+ * @return The dot product of the two vectors.
+ */
+int32_t SVector4Di::dot(const SVector4Df& vec) const
+{
+	int32_t ix = static_cast<int32_t>(vec.x);
+	int32_t iy = static_cast<int32_t>(vec.y);
+	int32_t iz = static_cast<int32_t>(vec.z);
+	int32_t iw = static_cast<int32_t>(vec.w);
+	int32_t iRet = x * ix + y * iy + z * iz + w * iw;
+	return (iRet);
+}
+
+/**
+ * Calculates the dot product of two SVector4Di objects.
+ *
+ * @param vec The SVector4Di object to calculate the dot product with.
+ * @return The dot product of the two vectors.
+ */
+int32_t SVector4Di::dot(const SVector4Di& vec) const
+{
+	int32_t iRet = x * vec.x + y * vec.y + z * vec.z + w * vec.w;
+	return (iRet);
+}
+
+/**
+ * Returns a pointer to the underlying integer array.
+ *
+ * This allows direct access to the x, y, z, and w components as a integer array.
+ *
+ * @return A pointer to the integer array.
+ */
+int32_t* SVector4Di::data()
+{
+	return (&(x));
+}
+
+/**
+ * Checks if all components of the SVector4Di object are zero.
+ *
+ * @return true if all components are zero, false otherwise.
+ */
+bool SVector4Di::IsZero() const
+{
+	return ((x + y + z + w) == 0);
+}
+
+/**
+ * Sets all components of the SVector4Di object to the specified value.
+ *
+ * @param fVal The value to set all components to.
+ */
+void SVector4Di::SetAll(const float fVal)
+{
+	x = y = z = w = static_cast<int32_t>(fVal);
+}
+
+/**
+ * Sets all components of the SVector4Di object to the specified value.
+ *
+ * @param fVal The value to set all components to.
+ */
+void SVector4Di::SetAll(const int32_t iVal)
+{
+	x = y = z = w = iVal;
+}
+
+/**
+ * Sets all components of the SVector4Di object to zero.
+ */
+void SVector4Di::SetToZero()
+{
+	x = y = z = w = 0;
+}
+
+/**
+ * Converts the SVector4Di object to a glm::ivec4 object.
+ *
+ * @return The equivalent glm::ivec4 object.
+ */
+glm::ivec4 SVector4Di::ToGLM() const
+{
+	return glm::ivec4(x, y, z, w);
+}
+
+/**
+ * Converts the SVector4Di object to an SVector3Di object by discarding the w component.
+ *
+ * @return The equivalent SVector3Di object.
+ */
+SVector3Di SVector4Di::To3D() const
+{
+	return SVector3Di(x, y, z);
+}
+
+/**
+ * Adds a scalar value to all components of an SVector4Di object.
+ *
+ * @param vec The SVector4Di object to add to.
+ * @param fVal The scalar value to add.
+ * @return The resulting SVector4Di object.
+ */
+SVector4Di operator+(const SVector4Di& vec, float fVal)
+{
+	int32_t iVal = static_cast<int32_t>(fVal);
+	SVector4Di Result(vec.x + iVal, vec.y + iVal, vec.z + iVal, vec.w + iVal);
+	return (Result);
+}
+
+/**
+ * Adds a scalar value to all components of an SVector4Di object.
+ *
+ * @param vec The SVector4Di object to add to.
+ * @param fVal The scalar value to add.
+ * @return The resulting SVector4Di object.
+ */
+SVector4Di operator+(const SVector4Di& vec, int32_t iVal)
+{
+	SVector4Di Result(vec.x + iVal, vec.y + iVal, vec.z + iVal, vec.w + iVal);
+	return (Result);
+}
+
+/**
+ * Subtracts a scalar value from all components of an SVector4Di object.
+ *
+ * @param vec The SVector4Di object to subtract from.
+ * @param fVal The scalar value to subtract.
+ * @return The resulting SVector4Di object.
+ */
+SVector4Di operator-(const SVector4Di& vec, float fVal)
+{
+	int32_t iVal = static_cast<int32_t>(fVal);
+	SVector4Di Result(vec.x - iVal, vec.y - iVal, vec.z - iVal, vec.w - iVal);
+	return (Result);
+}
+
+/**
+ * Subtracts a scalar value from all components of an SVector4Di object.
+ *
+ * @param vec The SVector4Di object to subtract from.
+ * @param fVal The scalar value to subtract.
+ * @return The resulting SVector4Di object.
+ */
+SVector4Di operator-(const SVector4Di& vec, int32_t iVal)
+{
+	SVector4Di Result(vec.x - iVal, vec.y - iVal, vec.z - iVal, vec.w - iVal);
+	return (Result);
+}
+
+/**
+ * Multiplies all components of an SVector4Di object by a scalar value.
+ *
+ * @param vec The SVector4Di object to multiply.
+ * @param fVal The scalar value to multiply by.
+ * @return The resulting SVector4Di object.
+ */
+SVector4Di operator*(const SVector4Di& vec, float fVal)
+{
+	int32_t iVal = static_cast<int32_t>(fVal);
+	SVector4Di Result(vec.x * iVal, vec.y * iVal, vec.z * iVal, vec.w * iVal);
+	return (Result);
+}
+
+/**
+ * Multiplies all components of an SVector4Di object by a scalar value.
+ *
+ * @param vec The SVector4Di object to multiply.
+ * @param fVal The scalar value to multiply by.
+ * @return The resulting SVector4Di object.
+ */
+SVector4Di operator*(const SVector4Di& vec, int32_t iVal)
+{
+	SVector4Di Result(vec.x * iVal, vec.y * iVal, vec.z * iVal, vec.w * iVal);
+	return (Result);
+}
+
+/**
+ * Divides all components of an SVector4Di object by a scalar value.
+ *
+ * @param vec The SVector4Di object to divide.
+ * @param fVal The scalar value to divide by.
+ * @return The resulting SVector4Di object.
+ * @throws std::domain_error If the divisor is zero.
+ */
+SVector4Di operator/(const SVector4Di& vec, float fVal)
+{
+	assert(fVal != 0.0f);
+	if (fVal == 0.0f)
+	{
+		throw std::domain_error("Division by zero in SVector4Di operator/");
+	}
+	int32_t iVal = static_cast<int32_t>(fVal);
+	SVector4Df Result(vec.x / iVal, vec.y / iVal, vec.z / iVal, vec.w / iVal);
+	return (Result);
+}
+
+/**
+ * Divides all components of an SVector4Di object by a scalar value.
+ *
+ * @param vec The SVector4Di object to divide.
+ * @param fVal The scalar value to divide by.
+ * @return The resulting SVector4Di object.
+ * @throws std::domain_error If the divisor is zero.
+ */
+SVector4Di operator/(const SVector4Di& vec, int32_t iVal)
+{
+	assert(iVal != 0);
+	if (iVal == 0)
+	{
+		throw std::domain_error("Division by zero in SVector4Di operator/");
+	}
+	SVector4Df Result(vec.x / iVal, vec.y / iVal, vec.z / iVal, vec.w / iVal);
+	return (Result);
+}
+
+/**
+ * Adds two SVector4Di and SVector4Df objects component-wise.
+ *
+ * @param vec1 The first SVector4Di object.
+ * @param vec2 The second SVector4Df object.
+ * @return The resulting SVector4Di object.
+ */
+SVector4Di operator+(const SVector4Di& vec1, const SVector4Df& vec2)
+{
+	int32_t ix = static_cast<int32_t>(vec2.x);
+	int32_t iy = static_cast<int32_t>(vec2.y);
+	int32_t iz = static_cast<int32_t>(vec2.z);
+	int32_t iw = static_cast<int32_t>(vec2.w);
+	SVector4Di Result(vec1.x + ix, vec1.y + iy, vec1.z + iz, vec1.w + iw);
+	return (Result);
+}
+
+/**
+ * Adds two SVector4Di and SVector4Di objects component-wise.
+ *
+ * @param vec1 The first SVector4Di object.
+ * @param vec2 The second SVector4Di object.
+ * @return The resulting SVector4Di object.
+ */
+SVector4Di operator+(const SVector4Di& vec1, const SVector4Di& vec2)
+{
+	SVector4Di Result(vec1.x + vec2.x, vec1.y + vec2.y, vec1.z + vec2.z, vec1.w + vec2.w);
+	return (Result);
+}
+
+/**
+ * Subtracts one SVector4Di object from another SVector4Df component-wise.
+ *
+ * @param vec1 The first SVector4Di object.
+ * @param vec2 The second SVector4Df object to subtract.
+ * @return The resulting SVector4Di object.
+ */
+SVector4Di operator-(const SVector4Di& vec1, const SVector4Df& vec2)
+{
+	int32_t ix = static_cast<int32_t>(vec2.x);
+	int32_t iy = static_cast<int32_t>(vec2.y);
+	int32_t iz = static_cast<int32_t>(vec2.z);
+	int32_t iw = static_cast<int32_t>(vec2.w);
+	SVector4Di Result(vec1.x - ix, vec1.y - iy, vec1.z - iz, vec1.w - iw);
+	return (Result);
+}
+
+/**
+ * Subtracts one SVector4Di object from another SVector4Di component-wise.
+ *
+ * @param vec1 The first SVector4Di object.
+ * @param vec2 The second SVector4Di object to subtract.
+ * @return The resulting SVector4Di object.
+ */
+SVector4Di operator-(const SVector4Di& vec1, const SVector4Di& vec2)
+{
+	SVector4Di Result(vec1.x - vec2.x, vec1.y - vec2.y, vec1.z - vec2.z, vec1.w - vec2.w);
+	return (Result);
+}
+
+/**
+ * Multiplies two SVector4Di and SVector4Df objects component-wise.
+ *
+ * @param vec1 The first SVector4Di object.
+ * @param vec2 The second SVector4Df object to multiply.
+ * @return The resulting SVector4Di object.
+ */
+SVector4Di operator*(const SVector4Di& vec1, const SVector4Df& vec2)
+{
+	int32_t ix = static_cast<int32_t>(vec2.x);
+	int32_t iy = static_cast<int32_t>(vec2.y);
+	int32_t iz = static_cast<int32_t>(vec2.z);
+	int32_t iw = static_cast<int32_t>(vec2.w);
+	SVector4Di Result(vec1.x * ix, vec1.y * iy, vec1.z * iz, vec1.w * iw);
+	return (Result);
+}
+
+/**
+ * Multiplies two SVector4Di and SVector4Di objects component-wise.
+ *
+ * @param vec1 The first SVector4Di object.
+ * @param vec2 The second SVector4Di object to multiply.
+ * @return The resulting SVector4Di object.
+ */
+SVector4Di operator*(const SVector4Di& vec1, const SVector4Di& vec2)
+{
+	SVector4Di Result(vec1.x * vec2.x, vec1.y * vec2.y, vec1.z * vec2.z, vec1.w * vec2.w);
+	return (Result);
+}
+
+/**
+ * Divides one SVector4Di object by another SVector4Df component-wise.
+ *
+ * @param vec1 The first SVector4Di object.
+ * @param vec2 The second SVector4Df object to divide by.
+ * @return The resulting SVector4Di object.
+ */
+SVector4Di operator/(const SVector4Di& vec1, const SVector4Df& vec2)
+{
+	int32_t ix = 0, iy = 0, iz = 0, iw = 0;
+	if (vec2.x != 0.0f)
+	{
+		ix = vec1.x / static_cast<int32_t>(vec2.x);
+	}
+	else
+	{
+		sys_err("SVector4Di/SVector4Df : Trying to divide X component by Zero");
+	}
+
+	if (vec2.y != 0.0f)
+	{
+		iy = vec1.y / static_cast<int32_t>(vec2.y);
+	}
+	else
+	{
+		sys_err("SVector4Di/SVector4Df : Trying to divide Y component by Zero");
+	}
+
+	if (vec2.z != 0.0f)
+	{
+		iz = vec1.z / static_cast<int32_t>(vec2.z);
+	}
+	else
+	{
+		sys_err("SVector4Di/SVector4Df : Trying to divide Z component by Zero");
+	}
+
+	if (vec2.w != 0.0f)
+	{
+		iw = vec1.w / static_cast<int32_t>(vec2.w);
+	}
+	else
+	{
+		sys_err("SVector4Di/SVector4Df : Trying to divide W component by Zero");
+	}
+
+	SVector4Di Result{ix, iy, iz , iw};
+	return (Result);
+}
+
+/**
+ * Divides one SVector4Di object by another SVector4Di component-wise.
+ *
+ * @param vec1 The first SVector4Di object.
+ * @param vec2 The second SVector4Di object to divide by.
+ * @return The resulting SVector4Di object.
+ */
+SVector4Di operator/(const SVector4Di& vec1, const SVector4Di& vec2)
+{
+	int32_t ix = 0, iy = 0, iz = 0, iw = 0;
+	if (vec2.x != 0)
+	{
+		ix = vec1.x / vec2.x;
+	}
+	else
+	{
+		sys_err("SVector4Di/SVector4Di : Trying to divide X component by Zero");
+	}
+
+	if (vec2.y != 0)
+	{
+		iy = vec1.y / vec2.y;
+	}
+	else
+	{
+		sys_err("SVector4Di/SVector4Di : Trying to divide Y component by Zero");
+	}
+
+	if (vec2.z != 0)
+	{
+		iz = vec1.z / vec2.z;
+	}
+	else
+	{
+		sys_err("SVector4Di/SVector4Di : Trying to divide Z component by Zero");
+	}
+
+	if (vec2.w != 0)
+	{
+		iw = vec1.w / vec2.w;
+	}
+	else
+	{
+		sys_err("SVector4Di/SVector4Di : Trying to divide W component by Zero");
+	}
+
+	SVector4Di Result{ ix, iy, iz , iw };
+	return (Result);
 }

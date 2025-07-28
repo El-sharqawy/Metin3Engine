@@ -1,5 +1,5 @@
 #include "stdafx.h"
-#include "camera.h"
+#include "Camera.h"
 #include <algorithm>
 
 static float MARGIN = 40.0f;
@@ -7,7 +7,7 @@ static float EDGE_STEP = 0.01f;
 
 CCamera::CCamera()
 {
-	TPersProjInfo PersProjInfo = { 45.0f, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, 0.1f, 5000.0f };
+	TPersProjInfo PersProjInfo = { 45.0f, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, 0.1f, 500000.0f };
 
 	// For NonTerrain:
 	const SVector3Df v3Pos = SVector3Df(0.0f, 0.0f, 0.0f);
@@ -24,10 +24,10 @@ CCamera::CCamera(GLubyte bCamNum)
 {
 	if (bCamNum == CAMERA_PRESPECTIVE)
 	{
-		TPersProjInfo PersProjInfo = { 45.0f, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, 0.1f, 5000.0f };
+		TPersProjInfo PersProjInfo = { 45.0f, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, 0.1f, 500000.0f };
 
 		// For NonTerrain:
-		const SVector3Df v3Pos = SVector3Df(0.0f, 10.0f, 0.0f);
+		const SVector3Df v3Pos = SVector3Df(10.0f, 5.0f, 25.0f);
 		const SVector3Df v3Target = SVector3Df(0.0f, 0.0f, 1.0f);
 
 		// For Terrain:
@@ -61,7 +61,7 @@ CCamera::CCamera(GLubyte bCamNum)
 	}
 	else // Default Prespective
 	{
-		TPersProjInfo PersProjInfo = { 45.0f, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, 0.1f, 5000.0f };
+		TPersProjInfo PersProjInfo = { 45.0f, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, 0.1f, 500000.0f };
 
 		// For NonTerrain:
 		const SVector3Df v3Pos = SVector3Df(0.0f, 0.0f, 0.0f);
@@ -511,6 +511,12 @@ void CCamera::UpdateViewVector()
 	m_v3View = m_v3Target.normalize();
 }
 
+void CCamera::InvertCameraPitch()
+{
+	m_fAngleV = -m_fAngleV;
+	OnUpdate();
+}
+
 void CCamera::UpdateBillBoardMatrix()
 {
 	// Get the billboard transformation matrix
@@ -674,6 +680,12 @@ CCamera* CCameraManager::GetCurrentCamera()
 {
 	assert(m_pCurrCamera);
 	return (m_pCurrCamera);
+}
+
+CCamera& CCameraManager::GetCurrentCameraRef()
+{
+	assert(m_pCurrCamera);
+	return (*m_pCurrCamera);
 }
 
 GLubyte CCameraManager::GetCurrentCameraNum()

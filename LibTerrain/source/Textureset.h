@@ -30,26 +30,11 @@ public:
 
 	bool SetTexture(size_t iIndex, const TTerrainTexture& Texture);
 
-	bool SetTexture(size_t iIndex,
-		const std::string& stFileName,
-		GLfloat fUScale,
-		GLfloat fVScale,
-		GLfloat fUOffset,
-		GLfloat fVOffset,
-		bool bIsSplat,
-		GLuint uiHeightMin,
-		GLuint uiHeightMax);
+	bool SetTexture(size_t iIndex, const std::string& stFileName);
 
 	bool AddTexture(const TTerrainTexture& Texture);
 
-	bool AddTexture(const std::string& stFileName,
-		GLfloat fUScale,
-		GLfloat fVScale,
-		GLfloat fUOffset,
-		GLfloat fVOffset,
-		bool bIsSplat,
-		GLuint uiHeightMin,
-		GLuint uiHeightMax);
+	bool AddTexture(const std::string& stFileName);
 
 	bool IsValidImage(const std::string& filePath);
 

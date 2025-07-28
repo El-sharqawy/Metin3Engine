@@ -24,6 +24,7 @@ public:
 	CTerrainMap* AllocMap();
 	bool LoadMap(const std::string& stMapName);
 	bool LoadMap(const std::string& stMapName, const SVector3Df& v3PlayerPos);
+	bool UnLoadMap(const std::string& stMapName);
 
 	// Get Current Map Refrence, Normal Functions Map
 	CTerrainMap& GetMapRef();
@@ -48,13 +49,18 @@ public:
 	// Save Data
 	bool SaveMapSettings(const std::string& stMapName);
 	bool SaveTerrains();
+	bool SaveAreas();
 
 	void UpdateEditingPoint(SVector3Df* v3IntersectionPoint);
 	void GetEditingData(GLint* iEditX, GLint* iEditZ, GLint* iSubCellX, GLint* iSubCellZ, GLint* iEditTerrainNumX, GLint* iEditTerrainNumZ);
 
 	void UpdateEditing();
 	void EditTerrain();
+	void EditTextures();
+	void EditAttributes();
+	void EditTerrainWater();
 
+	CTerrainMap& GetTerrainMapRef();
 	CTerrainMap* GetTerrainMapPtr();
 
 	// Editing Params Functions
@@ -81,6 +87,29 @@ public:
 
 	bool IsEditingTexture() const;
 	void SetEditingTexture(bool bEdit);
+
+	bool IsEditingAttribute() const;
+	void SetEditingAttribute(bool bEdit);
+
+	bool IsEditingWater() const;
+	void SetEditingWater(bool bEdit);
+
+	bool IsErasingAttribute() const;
+	void SetErasingAttribute(bool bErasing);
+
+	GLubyte GetAttributeType() const;
+	void SetAttributeType(GLubyte ubAttribute);
+
+	GLfloat GetWaterBrushHeight() const;
+	void SetWaterBrushHeight(GLfloat fHeight);
+
+	bool IsErasingWater() const;
+	void SetErasingWater(bool bErasing);
+
+	bool AddTerrainTexture(const std::string& stTextureName);
+	bool RemoveTerrainTexture(GLint iTextureNum);
+	void ReloadTerrainTextures();
+	void SelectedTextureIndex(GLint iSelectedTextureIndex);
 
 protected:
 	/*** Editor Variables ***/
@@ -109,4 +138,14 @@ protected:
 	bool m_bIsEditing;
 	bool m_bIsEditingHeight;
 	bool m_bIsEditingTexture;
+	bool m_bIsEditingAttribute;
+	bool m_bIsEditingWater;
+
+	bool m_bEraseAttribute;
+	GLubyte m_ubAttributeType;
+
+	GLfloat m_fWaterBrushHeight;
+	bool m_bEraseWater;
+
+	GLint m_iSelectedTextureIndex;
 };

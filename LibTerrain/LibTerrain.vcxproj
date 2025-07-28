@@ -23,20 +23,24 @@
     <ClInclude Include="source\ScopedTimer.h" />
     <ClInclude Include="source\Stdafx.h" />
     <ClInclude Include="source\Terrain.h" />
+    <ClInclude Include="source\TerrainAreaData.h" />
+    <ClInclude Include="source\TerrainAreaObjects.h" />
     <ClInclude Include="source\TerrainData.h" />
     <ClInclude Include="source\TerrainManager.h" />
     <ClInclude Include="source\TerrainMap.h" />
     <ClInclude Include="source\TerrainPatch.h" />
-    <ClInclude Include="source\TerrainVao.h" />
+    <ClInclude Include="source\TerrainVAO.h" />
+    <ClInclude Include="source\TerrainWater.h" />
     <ClInclude Include="source\Textureset.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="source\Stdafx.cpp" />
     <ClCompile Include="source\Terrain.cpp" />
+    <ClCompile Include="source\TerrainAreaData.cpp" />
     <ClCompile Include="source\TerrainManager.cpp" />
     <ClCompile Include="source\TerrainManagerEditor.cpp" />
     <ClCompile Include="source\TerrainMap.cpp" />
-    <ClCompile Include="source\TerrainMapFuncs.cpp" />
+    <ClCompile Include="source\TerrainMapAccessors.cpp" />
     <ClCompile Include="source\TerrainMapLoad.cpp" />
     <ClCompile Include="source\TerrainPatch.cpp" />
     <ClCompile Include="source\Textureset.cpp" />

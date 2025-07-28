@@ -4,12 +4,12 @@
 
 void CTerrainManager::ClearEditor()
 {
-	m_bBrushType = BRUSH_TYPE_UP;
-	m_bBrushShape = BRUSH_SHAPE_CIRCLE;
-	m_iBrushStrength = 1;
-	m_iBrushMaxStrength = 255;
+	m_bBrushType = BRUSH_TYPE_NONE;
+	m_bBrushShape = BRUSH_SHAPE_NONE;
+	m_iBrushStrength = 250;
+	m_iBrushMaxStrength = 250;
 	m_iBrushSize = 2;
-	m_iBrushMaxSize = 255;
+	m_iBrushMaxSize = 250;
 
 	m_iEditX = 0;
 	m_iEditZ = 0;
@@ -21,8 +21,17 @@ void CTerrainManager::ClearEditor()
 	m_v3PickingPoint = SVector3Df(0.0f);
 
 	m_bIsEditing = true;
-	m_bIsEditingHeight = true;
+	m_bIsEditingHeight = false;
 	m_bIsEditingTexture = false;
+	m_bIsEditingAttribute = false;
+	m_bIsEditingWater = true;
+
+	m_bEraseAttribute = false;
+	m_ubAttributeType = TERRAIN_ATTRIBUTE_NONE;
+
+	m_bEraseWater = false;
+	m_fWaterBrushHeight = 0.0f;
+	m_iSelectedTextureIndex = 1;
 
 	m_iNewMapSizeX = 0;
 	m_iNewMapSizeZ = 0;
@@ -114,6 +123,12 @@ bool CTerrainManager::SaveMap(const std::string& stMapName)
 	}
 
 	// Save Areas
+	if (!SaveAreas())
+	{
+		sys_err("CTerrainManager::SaveMap: Failed to Save Map Areas!");
+		return (false);
+	}
+
 	return (true);
 }
 
@@ -138,6 +153,11 @@ bool CTerrainManager::SaveTerrains()
 	return (m_pTerrainMap->SaveTerrains());
 }
 
+bool CTerrainManager::SaveAreas()
+{
+	return (m_pTerrainMap->SaveAreas());
+}
+
 void CTerrainManager::UpdateEditingPoint(SVector3Df* v3IntersectionPoint)
 {
 	m_pTerrainMap->GetPickingCoordinate(v3IntersectionPoint, &m_iEditX, &m_iEditZ, &m_iSubCellX, &m_iSubCellZ, &m_iEditTerrainNumX, &m_iEditTerrainNumZ);
@@ -158,7 +178,17 @@ void CTerrainManager::UpdateEditing()
 		else if (m_bIsEditingTexture)
 		{
 			// Edit Texture
+			EditTextures();
 		}
+		else if (m_bIsEditingAttribute)
+		{
+			EditAttributes();
+		}
+		else if (m_bIsEditingWater)
+		{
+			EditTerrainWater();
+		}
+
 	}
 }
 
@@ -177,8 +207,30 @@ void CTerrainManager::EditTerrain()
 	m_pTerrainMap->DrawHeightBrush(m_bBrushShape, m_bBrushType, m_iEditTerrainNumX, m_iEditTerrainNumZ, m_iEditX, m_iEditZ, m_iBrushSize, m_iBrushStrength);
 }
 
+void CTerrainManager::EditTextures()
+{
+	m_pTerrainMap->DrawTextureBrush(m_bBrushShape, m_iEditTerrainNumX, m_iEditTerrainNumZ, m_iEditX, m_iEditZ, m_iSubCellX, m_iSubCellZ, m_iBrushSize, m_iBrushStrength, m_iSelectedTextureIndex);
+}
+
+void CTerrainManager::EditAttributes()
+{
+	m_pTerrainMap->DrawAttributeBrush(m_bBrushShape, m_ubAttributeType, m_iEditTerrainNumX, m_iEditTerrainNumZ, m_iEditX, m_iEditZ, m_iSubCellX, m_iSubCellZ, m_iBrushSize, m_iBrushStrength, m_bEraseAttribute);
+}
+
+void CTerrainManager::EditTerrainWater()
+{
+	m_pTerrainMap->DrawWaterBrush(m_bBrushShape, m_iEditTerrainNumX, m_iEditTerrainNumZ, m_iEditX, m_iEditZ, m_iSubCellX, m_iSubCellZ, m_iBrushSize, m_iBrushStrength, m_fWaterBrushHeight, m_bEraseWater);
+}
+
+CTerrainMap& CTerrainManager::GetTerrainMapRef()
+{
+	assert(m_pTerrainMap != nullptr);
+	return (*m_pTerrainMap);
+}
+
 CTerrainMap* CTerrainManager::GetTerrainMapPtr()
 {
+	assert(m_pTerrainMap != nullptr);
 	return (m_pTerrainMap);
 }
 
@@ -209,7 +261,17 @@ GLint CTerrainManager::GetBrushStrength() const
 
 void CTerrainManager::SetBrushStrength(GLint iBrushStr)
 {
+	if (iBrushStr < 0)
+	{
+		iBrushStr = 1;
+	}
+	else if (iBrushStr > m_iBrushMaxStrength)
+	{
+		iBrushStr = m_iBrushMaxStrength;
+	}
+
 	m_iBrushStrength = iBrushStr;
+	m_pTerrainMap->SetBrushStrength(iBrushStr);
 }
 
 GLint CTerrainManager::GetBrushMaxStrength() const
@@ -220,6 +282,7 @@ GLint CTerrainManager::GetBrushMaxStrength() const
 void CTerrainManager::SetBrushMaxStrength(GLint iBrushMaxStr)
 {
 	m_iBrushMaxStrength = iBrushMaxStr;
+	m_pTerrainMap->SetBrushMaxStrength(iBrushMaxStr);
 }
 
 GLint CTerrainManager::GetBrushSize() const
@@ -229,7 +292,17 @@ GLint CTerrainManager::GetBrushSize() const
 
 void CTerrainManager::SetBrushSize(GLint iBrushSize)
 {
+	if (iBrushSize < 0)
+	{
+		iBrushSize = 1;
+	}
+	else if (iBrushSize > m_iBrushMaxSize)
+	{
+		iBrushSize = m_iBrushMaxSize;
+	}
+
 	m_iBrushSize = iBrushSize;
+	m_pTerrainMap->SetBrushSize(iBrushSize);
 }
 
 GLint CTerrainManager::GetBrushMaxSize() const
@@ -240,6 +313,7 @@ GLint CTerrainManager::GetBrushMaxSize() const
 void CTerrainManager::SetBrushMaxSize(GLint iBrushMaxSize)
 {
 	m_iBrushMaxSize = iBrushMaxSize;
+	m_pTerrainMap->SetBrushMaxSize(iBrushMaxSize);
 }
 
 bool CTerrainManager::IsEditing() const
@@ -259,9 +333,17 @@ bool CTerrainManager::IsEditingHeight() const
 
 void CTerrainManager::SetEditingHeight(bool bEdit)
 {
-	if (IsEditingTexture() && bEdit == true)
+	if (IsEditingTexture() && bEdit)
 	{
 		SetEditingTexture(false);
+	}
+	if (IsEditingAttribute() && bEdit)
+	{
+		SetEditingAttribute(false);
+	}
+	if (IsEditingWater() && bEdit)
+	{
+		SetEditingWater(false);
 	}
 
 	m_bIsEditingHeight = bEdit;
@@ -274,10 +356,150 @@ bool CTerrainManager::IsEditingTexture() const
 
 void CTerrainManager::SetEditingTexture(bool bEdit)
 {
-	if (IsEditingHeight() && bEdit == true)
+	if (IsEditingHeight() && bEdit)
 	{
 		SetEditingHeight(false);
 	}
+	if (IsEditingAttribute() && bEdit)
+	{
+		SetEditingAttribute(false);
+	}
+	if (IsEditingWater() && bEdit)
+	{
+		SetEditingWater(false);
+	}
 
 	m_bIsEditingTexture = bEdit;
+}
+
+bool CTerrainManager::IsEditingAttribute() const
+{
+	return (m_bIsEditingAttribute);
+}
+
+void CTerrainManager::SetEditingAttribute(bool bEdit)
+{
+	if (IsEditingHeight() && bEdit)
+	{
+		SetEditingHeight(false);
+	}
+	if (IsEditingTexture() && bEdit)
+	{
+		SetEditingTexture(false);
+	}
+	if (IsEditingWater() && bEdit)
+	{
+		SetEditingWater(false);
+	}
+
+	m_bIsEditingAttribute = bEdit;
+}
+
+bool CTerrainManager::IsEditingWater() const
+{
+	return (m_bIsEditingWater);
+}
+
+void CTerrainManager::SetEditingWater(bool bEdit)
+{
+	if (IsEditingHeight() && bEdit)
+	{
+		SetEditingHeight(false);
+	}
+	if (IsEditingTexture() && bEdit)
+	{
+		SetEditingTexture(false);
+	}
+	if (IsEditingAttribute() && bEdit)
+	{
+		SetEditingAttribute(false);
+	}
+
+	m_bIsEditingWater = bEdit;
+}
+
+bool CTerrainManager::IsErasingAttribute() const
+{
+	return (m_bEraseAttribute);
+}
+
+void CTerrainManager::SetErasingAttribute(bool bErasing)
+{
+	m_bEraseAttribute = bErasing;
+}
+
+GLubyte CTerrainManager::GetAttributeType() const
+{
+	return (m_ubAttributeType);
+}
+
+void CTerrainManager::SetAttributeType(GLubyte ubAttribute)
+{
+	m_ubAttributeType = ubAttribute;
+}
+
+GLfloat CTerrainManager::GetWaterBrushHeight() const
+{
+	return (m_fWaterBrushHeight);
+}
+
+void CTerrainManager::SetWaterBrushHeight(GLfloat fHeight)
+{
+	m_fWaterBrushHeight = fHeight;
+}
+
+bool CTerrainManager::IsErasingWater() const
+{
+	return (m_bEraseWater);
+}
+
+void CTerrainManager::SetErasingWater(bool bErasing)
+{
+	m_bEraseWater = bErasing;
+}
+
+bool CTerrainManager::AddTerrainTexture(const std::string& stTextureName)
+{
+	CTerrainTextureset* pTextureSet = CTerrain::GetTerrainTextureset();
+
+	TTerrainTexture terrainTexture;
+	terrainTexture.m_stFileName = stTextureName;
+
+	if (!pTextureSet->AddTexture(terrainTexture))
+	{
+		sys_err("CTerrainManager::AddTerrainTexture: Failed to Add Texture %s", stTextureName.c_str());
+		return (false);
+	}
+
+	ReloadTerrainTextures();
+	return (true);
+}
+
+bool CTerrainManager::RemoveTerrainTexture(GLint iTextureNum)
+{
+	CTerrainTextureset* pTextureSet = CTerrain::GetTerrainTextureset();
+
+	if (!pTextureSet->RemoveTexture(iTextureNum))
+	{
+		return (false);
+	}
+
+	ReloadTerrainTextures();
+	return (true);
+}
+
+void CTerrainManager::ReloadTerrainTextures()
+{
+	m_pTerrainMap->ReloadTextures();
+}
+
+void CTerrainManager::SelectedTextureIndex(GLint iSelectedTextureIndex)
+{
+	CTerrainTextureset* pTextureSet = CTerrain::GetTerrainTextureset();
+
+	if (iSelectedTextureIndex > pTextureSet->GetTexturesCount() || iSelectedTextureIndex < 0)
+	{
+		iSelectedTextureIndex = 0;
+	}
+	m_iSelectedTextureIndex = iSelectedTextureIndex;
 }

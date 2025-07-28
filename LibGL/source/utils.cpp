@@ -1,5 +1,5 @@
-#include "stdafx.h"
-#include "utils.h"
+#include "Stdafx.h"
+#include "Utils.h"
 #include "../../LibMath/source/grid.h"
 #include <filesystem>
 #include <ctime>
@@ -160,7 +160,7 @@ std::string GetFullPath(const std::string& Dir, const aiString& Path)
 }
 
 // write exactly data.size()*sizeof(GLuint) bytes into path+".gz"
-void SaveIndexRawGz(const std::string& path, const std::vector<GLuint>& data)
+void SaveHeightMapRawGz(const std::string& path, const CGrid<float>& heightMap)
 {
     gzFile f = gzopen((path + ".gz").c_str(), "wb6");           // write, level-6 compression :contentReference[oaicite:0]{index=0}
 
@@ -168,8 +168,8 @@ void SaveIndexRawGz(const std::string& path, const std::vector<GLuint>& data)
     {
         throw std::runtime_error("Failed to open " + path + ".gz for write");
     }
-    GLuint data_size = static_cast<GLuint>(data.size() * sizeof(GLuint));
-    int written = gzwrite(f, reinterpret_cast<const void*>(data.data()), data_size);          // :contentReference[oaicite:1]{index=1}
+    GLuint data_size = static_cast<GLuint>(heightMap.GetSize() * sizeof(SVector4Df));
+    int written = gzwrite(f, reinterpret_cast<const void*>(heightMap.data()), data_size);          // :contentReference[oaicite:1]{index=1}
 
     gzclose(f);
 
@@ -179,7 +179,7 @@ void SaveIndexRawGz(const std::string& path, const std::vector<GLuint>& data)
     }
 }
 
-void SaveIndexRawGz(const std::string& path, const std::vector<GLfloat>& data)
+void SaveWeightRawGz(const std::string& path, const CGrid<SVector4Df>& weightMap)
 {
     gzFile f = gzopen((path + ".gz").c_str(), "wb6");           // write, level-6 compression :contentReference[oaicite:0]{index=0}
 
@@ -187,8 +187,27 @@ void SaveIndexRawGz(const std::string& path, const std::vector<GLfloat>& data)
     {
         throw std::runtime_error("Failed to open " + path + ".gz for write");
     }
-    GLuint data_size = static_cast<GLuint>(data.size() * sizeof(GLfloat));
-    int written = gzwrite(f, reinterpret_cast<const void*>(data.data()), data_size);          // :contentReference[oaicite:1]{index=1}
+    GLuint data_size = static_cast<GLuint>(weightMap.GetSize() * sizeof(SVector4Df));
+    int written = gzwrite(f, reinterpret_cast<const void*>(weightMap.data()), data_size);          // :contentReference[oaicite:1]{index=1}
+
+    gzclose(f);
+
+    if (written <= 0)
+    {
+        throw std::runtime_error("gzwrite failed on " + path + ".gz");
+    }
+}
+
+void SaveIndexRawGz(const std::string& path, const CGrid<SVector4Di>& indexMap)
+{
+    gzFile f = gzopen((path + ".gz").c_str(), "wb6");           // write, level-6 compression :contentReference[oaicite:0]{index=0}
+
+    if (!f)
+    {
+        throw std::runtime_error("Failed to open " + path + ".gz for write");
+    }
+    GLuint data_size = static_cast<GLuint>(indexMap.GetSize() * sizeof(SVector4Di));
+    int written = gzwrite(f, reinterpret_cast<const void*>(indexMap.data()), data_size);          // :contentReference[oaicite:1]{index=1}
 
     gzclose(f);
 
@@ -199,37 +218,55 @@ void SaveIndexRawGz(const std::string& path, const std::vector<GLfloat>& data)
 }
 
 // read exactly data.size()*sizeof(GLuint) bytes from path+".gz"
-void LoadIndexRawGz(const std::string& path, std::vector<GLuint>& data)
+void LoadHeightMapRawGz(const std::string& path, CGrid<float>& heightMap)
 {
     gzFile f = gzopen((path + ".gz").c_str(), "rb");
     if (!f)
     {
         throw std::runtime_error("Failed to open " + path + ".gz for read");
     }
-    GLuint data_size = static_cast<GLuint>(data.size() * sizeof(GLuint));
-    int readBytes = gzread(f, reinterpret_cast<void*>(data.data()), data_size);           // :contentReference[oaicite:2]{index=2}
+    size_t data_size = static_cast<size_t>(heightMap.GetSize() * sizeof(float)); // FIX: use sizeof(float)
+    int readBytes = gzread(f, reinterpret_cast<void*>(heightMap.data()), data_size);
 
     gzclose(f);
 
-    if (readBytes != (int)(data.size() * sizeof(GLuint)))
+    if (readBytes != (int)data_size)
+    {
+        throw std::runtime_error("Unexpected size from gzread: " + std::to_string(readBytes));
+    }
+}
+
+void LoadWeightRawGz(const std::string& path, CGrid<SVector4Df>& weightMap)
+{
+    gzFile f = gzopen((path + ".gz").c_str(), "rb");
+    if (!f)
+    {
+        throw std::runtime_error("Failed to open " + path + ".gz for read");
+    }
+    GLuint data_size = static_cast<GLuint>(weightMap.GetSize() * sizeof(SVector4Df));
+    int readBytes = gzread(f, reinterpret_cast<void*>(weightMap.data()), data_size);           // :contentReference[oaicite:2]{index=2}
+
+    gzclose(f);
+
+    if (readBytes != (int)(weightMap.GetSize() * sizeof(GLuint)))
     {
         throw std::runtime_error("Unexpected size from gzread: " +std::to_string(readBytes));
     }
 }
 
-void LoadIndexRawGz(const std::string& path, std::vector<GLfloat>& data)
+void LoadIndexRawGz(const std::string& path, CGrid<SVector4Di>& indexMap)
 {
     gzFile f = gzopen((path + ".gz").c_str(), "rb");
     if (!f)
     {
         throw std::runtime_error("Failed to open " + path + ".gz for read");
     }
-    GLuint data_size = static_cast<GLuint>(data.size() * sizeof(GLfloat));
-    int readBytes = gzread(f, reinterpret_cast<void*>(data.data()), data_size);           // :contentReference[oaicite:2]{index=2}
+    GLuint data_size = static_cast<GLuint>(indexMap.GetSize() * sizeof(SVector4Di));
+    int readBytes = gzread(f, reinterpret_cast<void*>(indexMap.data()), data_size);           // :contentReference[oaicite:2]{index=2}
 
     gzclose(f);
 
-    if (readBytes != (int)(data.size() * sizeof(GLfloat)))
+    if (readBytes != (int)(indexMap.GetSize() * sizeof(SVector4Di)))
     {
         throw std::runtime_error("Unexpected size from gzread: " + std::to_string(readBytes));
     }

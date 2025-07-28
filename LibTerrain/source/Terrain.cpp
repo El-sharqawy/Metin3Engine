@@ -1,6 +1,8 @@
 #include "Stdafx.h"
 #include "Terrain.h"
 #include "TerrainMap.h"
+#include "../../LibGame/source/Skybox.h"
+
 
 CTerrain::CTerrain()
 {
@@ -26,6 +28,11 @@ void CTerrain::Initialize()
 			m_TerrainPatches[z * PATCH_XCOUNT + x].Clear();
 		}
 	}
+
+	safe_delete(m_SplatData.m_pIndexTexture);
+	safe_delete(m_SplatData.m_pWeightTexture);
+	safe_delete(m_AttrData.m_pAttrTexture);
+	safe_delete(m_WaterData.m_pWaterTexture);
 }
 
 void CTerrain::Clear()
@@ -44,32 +51,16 @@ bool CTerrain::LoadHeightMap(const std::string& stHeightMapFile)
 		return (false);
 	}
 
-	const GLint iWidth = HEIGHTMAP_RAW_XSIZE;
-	const GLint iHeight = HEIGHTMAP_RAW_ZSIZE;
-	const GLint iTotalSize = iWidth * iHeight;
-
-	// Allocate temporary buffer to read floats
-	std::vector<GLfloat> tempData(iTotalSize);
-
-	size_t readCount = fread(tempData.data(), sizeof(GLfloat), iTotalSize, fp);
+	// Allocate and read heights
+	m_fHeightMap.SetName("HeightMapGrid");
+	m_fHeightMap.InitGrid(HEIGHTMAP_RAW_XSIZE, HEIGHTMAP_RAW_ZSIZE);
+	size_t readCount = fread(m_fHeightMap.GetBaseAddr(), sizeof(GLfloat), m_fHeightMap.GetSize(), fp);
 	fclose(fp);
 
-	if (readCount != iTotalSize)
+	if (readCount != m_fHeightMap.GetSize())
 	{
-		sys_err("CTerrain::LoadHeightMap: Heightmap file read error: expected %d floats, got %zu", iTotalSize, readCount);
-		return (false);
-	}
-
-	// Initialize grid with the data
-	m_fHeightMap.InitGrid(iWidth, iHeight);
-
-	for (GLint z = 0; z < iHeight; z++)
-	{
-		for (GLint x = 0; x < iWidth; x++)
-		{
-			GLint i = z * iWidth + x;
-			m_fHeightMap.Set(x, z, tempData[i]);
-		}
+		sys_err("CTerrain::LoadHeightMap: height map file read error: expected %d, got %zu", m_fHeightMap.GetSize(), readCount);
+		return false;
 	}
 
 	return (true);
@@ -84,15 +75,14 @@ bool CTerrain::NewHeightMap(const std::string& stMapName)
 
 	sprintf_s(szFileName, "%s\\%06d\\height.raw", stMapName.c_str(), iTerrainID);
 
-
-	// Initialize the heightmap grid with default value 32767 (0x7fff)
+	// Initialize the heightmap grid with default value 0 (0x0)
 	CGrid<GLfloat> HeightMapGrid(HEIGHTMAP_RAW_XSIZE, HEIGHTMAP_RAW_ZSIZE, 0.0f);
 
 	errno_t err = fopen_s(&fp, szFileName, "wb");
 
 	if (!fp || err != 0)
 	{
-		sys_err("CMapTerrain::NewHeightMap: Failed to open heightmap file: %s", szFileName);
+		sys_err("CTerrain::NewHeightMap: Failed to open heightmap file: %s", szFileName);
 		return (false);
 	}
 
@@ -123,12 +113,599 @@ bool CTerrain::SaveHeightMap(const std::string& stMapName)
 
 	if (!fp || err != 0)
 	{
-		sys_err("CMapTerrain::SaveHeightMap: Failed to open heightmap file: %s, err: %d", szFileName, err);
+		sys_err("CTerrain::SaveHeightMap: Failed to open heightmap file: %s, err: %d", szFileName, err);
 		return (false);
 	}
 
 	fwrite(m_fHeightMap.GetBaseAddr(), sizeof(GLfloat), m_fHeightMap.GetSize(), fp);
 	fclose(fp);
+	return (true);
+}
+
+bool CTerrain::LoadAttributeMap(const std::string& stAttrMapFile)
+{
+	FILE* fp = nullptr;
+	errno_t err = fopen_s(&fp, stAttrMapFile.c_str(), "rb");
+
+	if (!fp || err != 0)
+	{
+		sys_err("CTerrain::LoadAttributeMap: Failed to open attribute map file: %s", stAttrMapFile.c_str());
+		return (false);
+	}
+
+	// Allocate and read heights
+	m_AttrData.m_ubAttrMap.SetName("AttributeMapGrid");
+	m_AttrData.m_ubAttrMap.InitGrid(ATTRMAP_XSIZE, ATTRMAP_ZSIZE);
+	size_t readCount = fread(m_AttrData.m_ubAttrMap.GetBaseAddr(), sizeof(GLubyte), m_AttrData.m_ubAttrMap.GetSize(), fp);
+	fclose(fp);
+
+	if (readCount != m_AttrData.m_ubAttrMap.GetSize())
+	{
+		sys_err("CTerrain::LoadAttributeMap: attribute map file read error: expected %d, got %zu", m_AttrData.m_ubAttrMap.GetSize(), readCount);
+		return false;
+	}
+
+	safe_delete(m_AttrData.m_pAttrTexture);
+
+	m_AttrData.m_pAttrTexture = new CTexture(GL_TEXTURE_2D);
+	m_AttrData.m_pAttrTexture->Generate();
+	glTextureStorage2D(m_AttrData.m_pAttrTexture->GetTextureID(), 1, GL_R8UI, ATTRMAP_XSIZE, ATTRMAP_ZSIZE);
+	glTextureSubImage2D(
+		m_AttrData.m_pAttrTexture->GetTextureID(),
+		0,
+		0, 0,
+		ATTRMAP_XSIZE,
+		ATTRMAP_ZSIZE,
+		GL_RED_INTEGER,
+		GL_UNSIGNED_BYTE,
+		m_AttrData.m_ubAttrMap.GetBaseAddr()
+	);
+	m_AttrData.m_pAttrTexture->SetFiltering(GL_NEAREST, GL_NEAREST); // <-- Important!
+	m_AttrData.m_pAttrTexture->SetWrapping(GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE);
+	m_AttrData.m_pAttrTexture->MakeResident();
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	return (true);
+}
+
+bool CTerrain::NewAttributeMap(const std::string& stMapName)
+{
+	char szFileName[256] = {};
+	GLint iTerrainID = m_iTerrCoordX * 1000L + m_iTerrCoordZ;
+	// Write the grid to file
+	FILE* fp = nullptr;
+
+	sprintf_s(szFileName, "%s\\%06d\\attr.raw", stMapName.c_str(), iTerrainID);
+
+	// Initialize the heightmap grid with default value 0 (0x0)
+	CGrid<GLubyte> AttrMapGrid(ATTRMAP_XSIZE, ATTRMAP_ZSIZE, TERRAIN_ATTRIBUTE_NONE);
+
+	errno_t err = fopen_s(&fp, szFileName, "wb");
+
+	if (!fp || err != 0)
+	{
+		sys_err("CTerrain::NewAttributeMap: Failed to open attribute map file: %s", szFileName);
+		return (false);
+	}
+
+	if (fp)
+	{
+		fwrite(AttrMapGrid.GetBaseAddr(), sizeof(GLubyte), AttrMapGrid.GetSize(), fp);
+		fclose(fp);
+		return (true);
+	}
+	return (false);
+}
+
+bool CTerrain::SaveAttributeMap(const std::string& stMapName)
+{
+	char szFileName[256] = {};
+	GLint iTerrainID = m_iTerrCoordX * 1000L + m_iTerrCoordZ;
+	// Write the grid to file
+	FILE* fp = nullptr;
+
+	sprintf_s(szFileName, "%s\\%06d\\attr.raw", stMapName.c_str(), iTerrainID);
+
+	if (!m_AttrData.m_ubAttrMap.IsInitialized())
+	{
+		sys_err("CTerrain::SaveAttributeMap: Failed to save attribute map file: %s, attribute map not Initialized", szFileName);
+		return (false);
+	}
+	errno_t err = fopen_s(&fp, szFileName, "wb");
+
+	if (!fp || err != 0)
+	{
+		sys_err("CTerrain::SaveAttributeMap: Failed to attribute map file: %s, err: %d", szFileName, err);
+		return (false);
+	}
+
+	fwrite(m_AttrData.m_ubAttrMap.GetBaseAddr(), sizeof(GLubyte), m_AttrData.m_ubAttrMap.GetSize(), fp);
+	fclose(fp);
+	return (true);
+}
+
+bool CTerrain::LoadWaterMap(const std::string& stWaterMapFile)
+{
+	if (!CheckLoadingWaterMap(stWaterMapFile))
+	{
+		m_WaterData.m_ubWaterMap.InitGrid(WATERMAP_XSIZE, WATERMAP_ZSIZE, 0xFF);
+		m_WaterData.m_ubNumWater = 0;
+		for (size_t i = 0; i < MAX_WATER_NUM; ++i)
+		{
+			m_WaterData.m_fWaterHeight[i] = FLT_MIN;
+		}
+		safe_delete(m_WaterData.m_pWaterTexture);
+
+		return (false);
+	}
+
+	return (true);
+}
+
+bool CTerrain::NewWaterMap(const std::string& stMapName)
+{
+	char szFileName[256] = {};
+	GLint iTerrainID = m_iTerrCoordX * 1000L + m_iTerrCoordZ;
+	// Write the grid to file
+	FILE* fp = nullptr;
+
+	sprintf_s(szFileName, "%s\\%06d\\water.raw", stMapName.c_str(), iTerrainID);
+
+	// Initialize the heightmap grid with default value 0 (0x0)
+	CGrid<GLubyte> WaterMapGrid(WATERMAP_XSIZE, WATERMAP_ZSIZE, 0xFF);
+	GLubyte ubWaterNum = 0;
+	GLfloat fWaterHeight[MAX_WATER_NUM + 1] = { FLT_MIN };
+
+	errno_t err = fopen_s(&fp, szFileName, "wb");
+
+	if (!fp || err != 0)
+	{
+		sys_err("CTerrain::NewWaterMap: Failed to open water map file: %s", szFileName);
+		return (false);
+	}
+
+	if (fp)
+	{
+		fwrite(WaterMapGrid.GetBaseAddr(), sizeof(GLubyte), WaterMapGrid.GetSize(), fp);
+		fwrite(&ubWaterNum, sizeof(GLubyte), 1, fp);
+		if (ubWaterNum > 0)
+		{
+			fwrite(fWaterHeight, ubWaterNum * sizeof(GLfloat), 1, fp);
+		}
+
+		fclose(fp);
+		return (true);
+	}
+	return (false);
+}
+
+bool CTerrain::SaveWaterMap(const std::string& stMapName)
+{
+	RecalculateWaterMap();
+
+	char szFileName[256] = {};
+	GLint iTerrainID = m_iTerrCoordX * 1000L + m_iTerrCoordZ;
+	// Write the grid to file
+	FILE* fp = nullptr;
+
+	sprintf_s(szFileName, "%s\\%06d\\water.raw", stMapName.c_str(), iTerrainID);
+
+	if (!m_WaterData.m_ubWaterMap.IsInitialized())
+	{
+		sys_err("CTerrain::SaveWaterMap: Failed to save water map file: %s, attribute map not Initialized", szFileName);
+		return (false);
+	}
+	errno_t err = fopen_s(&fp, szFileName, "wb");
+
+	if (!fp || err != 0)
+	{
+		sys_err("CTerrain::SaveWaterMap: Failed to water map file: %s, err: %d", szFileName, err);
+		return (false);
+	}
+
+	fwrite(m_WaterData.m_ubWaterMap.GetBaseAddr(), sizeof(GLubyte), m_WaterData.m_ubWaterMap.GetSize(), fp);
+	fwrite(&m_WaterData.m_ubNumWater, sizeof(GLubyte), 1, fp);
+	if (m_WaterData.m_ubNumWater > 0)
+	{
+		fwrite(m_WaterData.m_fWaterHeight, m_WaterData.m_ubNumWater * sizeof(GLfloat), 1, fp);
+	}
+
+	fclose(fp);
+	return (true);
+}
+
+bool CTerrain::CheckLoadingWaterMap(const std::string& stWaterMapFile)
+{
+	FILE* fp = nullptr;
+	errno_t err = fopen_s(&fp, stWaterMapFile.c_str(), "rb");
+
+	if (!fp || err != 0)
+	{
+		sys_err("CTerrain::CheckLoadingWaterMap: Failed to open water map file: %s", stWaterMapFile.c_str());
+		return (false);
+	}
+
+	// Allocate if needed
+	if (!m_WaterData.m_ubWaterMap.IsInitialized())
+	{
+		m_WaterData.m_ubWaterMap.InitGrid(WATERMAP_XSIZE, WATERMAP_ZSIZE); // assuming fixed size
+	}
+
+	// Read water map data
+	size_t mapSize = m_WaterData.m_ubWaterMap.GetSize();
+	fread(m_WaterData.m_ubWaterMap.GetBaseAddr(), sizeof(GLubyte), mapSize, fp);
+
+	// Read water count
+	fread(&m_WaterData.m_ubNumWater, sizeof(GLubyte), 1, fp);
+
+	if (m_WaterData.m_ubNumWater > MAX_WATER_NUM)
+	{
+		sys_err("CTerrain::CheckLoadingWaterMap: Invalid water count: %u", m_WaterData.m_ubNumWater);
+		fclose(fp);
+		return false;
+	}
+
+	// Read water heights (directly into the fixed array)
+	if (m_WaterData.m_ubNumWater > 0)
+	{
+		size_t toRead = std::min<size_t>(m_WaterData.m_ubNumWater, MAX_WATER_NUM);
+		size_t readCount = fread(m_WaterData.m_fWaterHeight, sizeof(GLfloat), toRead, fp);
+		if (readCount != toRead)
+		{
+			sys_err("CTerrain::CheckLoadingWaterMap: Failed to read water heights, expected %zu, got %zu", toRead, readCount);
+			fclose(fp);
+			return false;
+		}
+	}
+	else
+	{
+		// If no water, set all to FLT_MIN
+		for (size_t i = 0; i < MAX_WATER_NUM; ++i)
+		{
+			m_WaterData.m_fWaterHeight[i] = FLT_MIN;
+		}
+	}
+
+	fclose(fp);
+
+	safe_delete(m_WaterData.m_pWaterTexture);
+
+	m_WaterData.m_pWaterTexture = new CTexture(GL_TEXTURE_2D);
+	m_WaterData.m_pWaterTexture->Generate();
+	glTextureStorage2D(m_WaterData.m_pWaterTexture->GetTextureID(), 1, GL_R8UI, WATERMAP_XSIZE, WATERMAP_ZSIZE);
+	glTextureSubImage2D(
+		m_WaterData.m_pWaterTexture->GetTextureID(),
+		0,
+		0, 0,
+		WATERMAP_XSIZE,
+		WATERMAP_ZSIZE,
+		GL_RED_INTEGER,
+		GL_UNSIGNED_BYTE,
+		m_WaterData.m_ubWaterMap.GetBaseAddr()
+	);
+	m_WaterData.m_pWaterTexture->SetFiltering(GL_NEAREST, GL_NEAREST); // <-- Important!
+	m_WaterData.m_pWaterTexture->SetWrapping(GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE);
+	m_WaterData.m_pWaterTexture->MakeResident();
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	return (true);
+}
+
+void CTerrain::UpdateWaterData()
+{
+	if (!m_WaterData.m_ubWaterMap.IsInitialized())
+	{
+		sys_err("CTerrain::UpdateWaterData: Water map not initialized, cannot update water data.");
+		return;
+	}
+
+	if (m_WaterData.m_pWaterTexture)
+	{
+		glTextureSubImage2D(m_WaterData.m_pWaterTexture->GetTextureID(),
+			0, 0, 0,
+			WATERMAP_XSIZE, WATERMAP_ZSIZE,
+			GL_RED_INTEGER, GL_UNSIGNED_BYTE,
+			m_WaterData.m_ubWaterMap.GetBaseAddr());
+	}
+}
+
+void CTerrain::GetWaterHeightByNum(GLubyte ubWaterNum, GLfloat* pfWaterHeight)
+{
+	if (ubWaterNum > m_WaterData.m_ubNumWater)
+	{
+		sys_err("CTerrain::GetWaterHeightByNum WaterNum %d exceeds limits! (Total: %d)!", ubWaterNum, m_WaterData.m_ubNumWater);
+		return;
+	}
+
+	*pfWaterHeight = m_WaterData.m_fWaterHeight[ubWaterNum];
+}
+
+GLfloat CTerrain::GetWaterHeightByNum(GLubyte ubWaterNum)
+{
+	if (ubWaterNum > m_WaterData.m_ubNumWater)
+	{
+		//sys_err("CTerrain::GetWaterHeightByNum WaterNum %d exceeds limits! (Total: %d)!", ubWaterNum, m_WaterData.m_ubNumWater);
+		return 0;
+	}
+
+	return (m_WaterData.m_fWaterHeight[ubWaterNum]);
+}
+
+bool CTerrain::GetWaterHeight(GLint iX, GLint iZ, GLfloat* pfWaterHeight)
+{
+	GLubyte ubWaterNum = m_WaterData.m_ubWaterMap.Get(iX, iZ);
+	if (ubWaterNum > m_WaterData.m_ubNumWater)
+	{
+		sys_err("CTerrain::GetWaterHeight WaterNum %d exceeds limits for (%d, %d)! (Total: %d)!", ubWaterNum, iX, iZ, m_WaterData.m_ubNumWater);
+		return false;
+	}
+
+	*pfWaterHeight = (m_WaterData.m_fWaterHeight[ubWaterNum]);
+	return (true);
+}
+
+GLfloat CTerrain::GetWaterHeight(GLint iX, GLint iZ)
+{
+	GLubyte ubWaterNum = m_WaterData.m_ubWaterMap.Get(iX, iZ);
+	if (ubWaterNum > m_WaterData.m_ubNumWater)
+	{
+		//sys_err("CTerrain::GetWaterHeight WaterNum %d exceeds limits for (%d, %d)! (Total: %d)!", ubWaterNum, iX, iZ, m_WaterData.m_ubNumWater);
+		return 0;
+	}
+
+	return (m_WaterData.m_fWaterHeight[ubWaterNum]);
+}
+
+GLfloat CTerrain::GetWaterHeight(GLfloat fX, GLfloat fZ)
+{
+	GLint iX = static_cast<GLint>(fX);
+	GLint iZ = static_cast<GLint>(fZ);
+
+	GLubyte ubWaterNum = m_WaterData.m_ubWaterMap.Get(iX, iZ);
+	if (ubWaterNum > m_WaterData.m_ubNumWater)
+	{
+		//sys_err("CTerrain::GetWaterHeight WaterNum %d exceeds limits for (%d, %d)! (Total: %d)!", ubWaterNum, iX, iZ, m_WaterData.m_ubNumWater);
+		return 0;
+	}
+
+	return (m_WaterData.m_fWaterHeight[ubWaterNum]);
+}
+
+bool CTerrain::LoadSplatMapWeight(const std::string& stSplatMapWeightFile)
+{
+	FILE* fp = nullptr;
+	errno_t err = fopen_s(&fp, stSplatMapWeightFile.c_str(), "rb");
+
+	if (!fp || err != 0)
+	{
+		sys_err("CTerrain::LoadSplatMapWeight: Failed to open splatmap weight file: %s", stSplatMapWeightFile.c_str());
+		return (false);
+	}
+
+	// Allocate and read weights
+	m_SplatData.weightGrid.SetName("SplatMapWeight");
+	m_SplatData.weightGrid.InitGrid(TILEMAP_RAW_XSIZE, TILEMAP_RAW_ZSIZE);
+	size_t readCount = fread(m_SplatData.weightGrid.GetBaseAddr(), sizeof(SVector4Df), m_SplatData.weightGrid.GetSize(), fp);
+	fclose(fp);
+
+	if (readCount != m_SplatData.weightGrid.GetSize())
+	{
+		sys_err("CTerrain::LoadSplatMap: Splat file read error: expected %d, got %zu", m_SplatData.weightGrid.GetSize(), readCount);
+		return false;
+	}
+
+	safe_delete(m_SplatData.m_pWeightTexture);
+
+	m_SplatData.m_pWeightTexture = new CTexture(GL_TEXTURE_2D);
+	m_SplatData.m_pWeightTexture->GenerateEmptyTexture2D(TILEMAP_RAW_XSIZE, TILEMAP_RAW_ZSIZE, GL_RGBA32F);
+	m_SplatData.m_pWeightTexture->SetFiltering(GL_LINEAR, GL_LINEAR); // <-- Important!
+	m_SplatData.m_pWeightTexture->SetWrapping(GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE);
+	m_SplatData.m_pWeightTexture->MakeResident();
+
+	glBindTexture(GL_TEXTURE_2D, m_SplatData.m_pWeightTexture->GetTextureID());
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, TILEMAP_RAW_XSIZE, TILEMAP_RAW_ZSIZE, GL_RGBA, GL_FLOAT, m_SplatData.weightGrid.GetBaseAddr());
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	return (true);
+}
+
+bool CTerrain::LoadSplatMapIndex(const std::string& stSplatMapIndexFile)
+{
+	FILE* fp = nullptr;
+	errno_t err = fopen_s(&fp, stSplatMapIndexFile.c_str(), "rb");
+
+	if (!fp || err != 0)
+	{
+		sys_err("CTerrain::LoadSplatMapIndices: Failed to open splatmap indices file: %s", stSplatMapIndexFile.c_str());
+		return (false);
+	}
+
+	// Allocate and read weights
+	m_SplatData.indexGrid.SetName("SplatMapIndex");
+	m_SplatData.indexGrid.InitGrid(TILEMAP_RAW_XSIZE, TILEMAP_RAW_ZSIZE);
+	size_t readCount = fread(m_SplatData.indexGrid.GetBaseAddr(), sizeof(SVector4Di), m_SplatData.indexGrid.GetSize(), fp);
+	fclose(fp);
+
+	if (readCount != m_SplatData.indexGrid.GetSize())
+	{
+		sys_err("CTerrain::LoadSplatMap: Splat file read error: expected %d, got %zu", m_SplatData.indexGrid.GetSize(), readCount);
+		return false;
+	}
+
+	safe_delete(m_SplatData.m_pIndexTexture);
+
+	m_SplatData.m_pIndexTexture = new CTexture(GL_TEXTURE_2D);
+	m_SplatData.m_pIndexTexture->GenerateEmptyTexture2D(TILEMAP_RAW_XSIZE, TILEMAP_RAW_ZSIZE, GL_RGBA32UI);
+	m_SplatData.m_pIndexTexture->SetFiltering(GL_NEAREST, GL_NEAREST); // <-- Important!
+	m_SplatData.m_pIndexTexture->SetWrapping(GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE);
+	m_SplatData.m_pIndexTexture->MakeResident();
+
+	glBindTexture(GL_TEXTURE_2D, m_SplatData.m_pIndexTexture->GetTextureID());
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, TILEMAP_RAW_XSIZE, TILEMAP_RAW_ZSIZE, GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_SplatData.indexGrid.GetBaseAddr());
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	return (true);
+}
+
+bool CTerrain::NewSplatMap(const std::string& stMapName)
+{
+	char szFileName[256] = {};
+	GLint iTerrainID = m_iTerrCoordX * 1000L + m_iTerrCoordZ;
+	// Write the grid to file
+	FILE* fp = nullptr;
+
+	// Initialize the weight map grid with default value 0 (0x0)
+	sprintf_s(szFileName, "%s\\%06d\\splat_weight.raw", stMapName.c_str(), iTerrainID);
+	CGrid<SVector4Df> SplatMapWeightGrid(TILEMAP_RAW_XSIZE, TILEMAP_RAW_ZSIZE, SVector4Df(0.0f));
+	errno_t err = fopen_s(&fp, szFileName, "wb");
+	if (!fp || err != 0)
+	{
+		sys_err("CTerrain::NewSplatMap: Failed to create splat weight file: %s", szFileName);
+		return (false);
+	}
+	fwrite(SplatMapWeightGrid.GetBaseAddr(), sizeof(SVector4Df), SplatMapWeightGrid.GetSize(), fp);
+	fclose(fp);
+
+	// Initialize the index map grid with default value 0 (0x0)
+	sprintf_s(szFileName, "%s\\%06d\\splat_index.raw", stMapName.c_str(), iTerrainID);
+	CGrid<SVector4Di> SplatMapIndexGrid(TILEMAP_RAW_XSIZE, TILEMAP_RAW_ZSIZE, SVector4Di(0.0f));
+	err = fopen_s(&fp, szFileName, "wb");
+	if (!fp || err != 0)
+	{
+		sys_err("CTerrain::NewSplatMap: Failed to create splat index file: %s", szFileName);
+		return (false);
+	}
+	fwrite(SplatMapIndexGrid.GetBaseAddr(), sizeof(SVector4Di), SplatMapIndexGrid.GetSize(), fp);
+	fclose(fp);
+
+	return (true);
+}
+
+bool CTerrain::SaveSplatMap(const std::string& stMapName)
+{
+	char szFileName[256] = {};
+	GLint iTerrainID = m_iTerrCoordX * 1000L + m_iTerrCoordZ;
+	// Write the grid to file
+	FILE* fp = nullptr;
+
+	// Save the weight map grid
+	sprintf_s(szFileName, "%s\\%06d\\splat_weight.raw", stMapName.c_str(), iTerrainID);
+	errno_t err = fopen_s(&fp, szFileName, "wb");
+	if (!fp || err != 0)
+	{
+		sys_err("CTerrain::SaveSplatMap: Failed to save splat weight file: %s", szFileName);
+		return (false);
+	}
+	fwrite(m_SplatData.weightGrid.GetBaseAddr(), sizeof(SVector4Df), m_SplatData.weightGrid.GetSize(), fp);
+	fclose(fp);
+
+	// Save the index map grid
+	sprintf_s(szFileName, "%s\\%06d\\splat_index.raw", stMapName.c_str(), iTerrainID);
+	err = fopen_s(&fp, szFileName, "wb");
+	if (!fp || err != 0)
+	{
+		sys_err("CTerrain::SaveSplatMap: Failed to save splat weight file: %s", szFileName);
+		return (false);
+	}
+	fwrite(m_SplatData.indexGrid.GetBaseAddr(), sizeof(SVector4Di), m_SplatData.indexGrid.GetSize(), fp);
+	fclose(fp);
+
+	return (true);
+}
+
+void CTerrain::UpdateSplatsData()
+{
+	if (!m_SplatData.m_pWeightTexture || !m_SplatData.m_pIndexTexture)
+	{
+		return;
+	}
+
+	glTextureSubImage2D(m_SplatData.m_pWeightTexture->GetTextureID(),
+		0, 0, 0,
+		TILEMAP_RAW_XSIZE, TILEMAP_RAW_ZSIZE,
+		GL_RGBA, GL_FLOAT,
+		m_SplatData.weightGrid.GetBaseAddr());
+
+	// Upload Index Map
+	glTextureSubImage2D(m_SplatData.m_pIndexTexture->GetTextureID(),
+		0, 0, 0,
+		TILEMAP_RAW_XSIZE, TILEMAP_RAW_ZSIZE,
+		GL_RGBA_INTEGER, GL_UNSIGNED_INT,
+		m_SplatData.indexGrid.GetBaseAddr());
+ }
+
+void CTerrain::SetSplatTexel(GLint iX, GLint iZ, const SVector4Df& weights, const SVector4Di& indices)
+{
+	if (iX < 0 || iZ < 0 || iX >= TILEMAP_RAW_XSIZE || iZ >= TILEMAP_RAW_ZSIZE)
+		return;
+
+	m_SplatData.weightGrid.Set(iX, iZ, weights);
+	m_SplatData.indexGrid.Set(iX, iZ, indices);
+}
+
+void CTerrain::SetupBaseTexture()
+{
+	// Fill the weight grid: R=1.0, G/B/A=0.0
+	SVector4Df baseWeight(0.5f, 0.0f, 0.0f, 0.0f);
+
+	// Fill the index grid: all channels = 0
+	SVector4Di baseIndex(0, 1, 2, 3);
+
+	for (int z = 0; z < TILEMAP_RAW_ZSIZE; ++z)
+	{
+		for (int x = 0; x < TILEMAP_RAW_XSIZE; ++x)
+		{
+			m_SplatData.weightGrid.Set(x, z, baseWeight);
+			m_SplatData.indexGrid.Set(x, z, baseIndex);
+		}
+	}
+
+	// Upload to GPU
+	UpdateSplatsData();
+}
+
+void CTerrain::UpdateAttrsData()
+{
+	if (!m_AttrData.m_pAttrTexture)
+	{
+		return;
+	}
+
+	glTextureSubImage2D(m_AttrData.m_pAttrTexture->GetTextureID(),
+		0, 0, 0,
+		ATTRMAP_XSIZE, ATTRMAP_ZSIZE,
+		GL_RED_INTEGER, GL_UNSIGNED_BYTE,
+		m_AttrData.m_ubAttrMap.GetBaseAddr());
+}
+
+bool CTerrain::NewTerrainProperties(const std::string& stMapName)
+{
+	GLint iTerrainID = m_iTerrCoordX * 1000 + m_iTerrCoordZ;
+
+	char c_szTerrainData[256];
+	sprintf_s(c_szTerrainData, "%s\\%06d\\TerrainData.json", stMapName.c_str(), iTerrainID);
+	json jsonMapData;
+
+	jsonMapData["script_type"] = "TerrainProperties";
+	jsonMapData["terrain_name"] = m_stTerrainName;
+
+	// Save Map Settings File
+	try
+	{
+		std::ofstream file(c_szTerrainData);
+		file.exceptions(std::ofstream::failbit | std::ofstream::badbit); // <-- this is critical
+
+		file << std::setw(4) << jsonMapData << std::endl;
+		file.close();
+
+		sys_log("CTerrain::CreateTerrainProperties: successfully created area property file (%s)", c_szTerrainData);
+	}
+	catch (const std::exception& e)
+	{
+		sys_err("CTerrain::CreateTerrainProperties: Failed to created the file %s, error: %s", c_szTerrainData, e.what());
+		return (false);
+	}
+
 	return (true);
 }
 
@@ -152,11 +729,11 @@ bool CTerrain::SaveTerrainProperties(const std::string& stMapName)
 		file << std::setw(4) << jsonMapData << std::endl;
 		file.close();
 
-		sys_log("CMapTerrain::SaveTerrainProperties: successfully saved area property file (%s)", c_szTerrainData);
+		sys_log("CTerrain::SaveTerrainProperties: successfully saved area property file (%s)", c_szTerrainData);
 	}
 	catch (const std::exception& e)
 	{
-		sys_err("CMapTerrain::SaveTerrainProperties: Failed to Save the file %s, error: %s", c_szTerrainData, e.what());
+		sys_err("CTerrain::SaveTerrainProperties: Failed to Save the file %s, error: %s", c_szTerrainData, e.what());
 		return (false);
 	}
 
@@ -182,16 +759,15 @@ void CTerrain::CalculateTerrainPatch(GLint iPatchNumX, GLint iPatchNumZ)
 
 		const GLint iWidth = HEIGHTMAP_RAW_XSIZE;
 		const GLint iHeight = HEIGHTMAP_RAW_ZSIZE;
-		m_fHeightMap.InitGrid(iWidth, iHeight);
+		m_fHeightMap.InitGrid(iWidth, iHeight, 0.0f);
+	}
 
-		for (GLint z = 0; z < iHeight; z++)
-		{
-			for (GLint x = 0; x < iWidth; x++)
-			{
-				GLint i = z * iWidth + x;
-				m_fHeightMap.Set(x, z, 0.0f);
-			}
-		}
+	if (!m_WaterData.m_ubWaterMap.IsInitialized())
+	{
+		sys_err("CTerrain::CalculateTerrainPatch: Terrain Patch Water Data is not set");
+		const GLint iWidth = WATERMAP_XSIZE;
+		const GLint iHeight = WATERMAP_ZSIZE;
+		m_WaterData.m_ubWaterMap.InitGrid(iWidth, iHeight, 0xFF);
 	}
 
 	GLint iPatchNum = iPatchNumZ * PATCH_XCOUNT + iPatchNumX;
@@ -209,23 +785,40 @@ void CTerrain::CalculateTerrainPatch(GLint iPatchNumX, GLint iPatchNumZ)
 	GLint iPatchStartZ = iPatchNumZ * PATCH_ZSIZE;
 
 	GLfloat* fHeightPtr = m_fHeightMap.GetAddr(iPatchStartX, iPatchStartZ);
+	GLubyte* ubWaterPtr = m_WaterData.m_ubWaterMap.GetAddr(iPatchStartX, iPatchStartZ);
 
 	GLfloat fX = static_cast<GLfloat>(m_iTerrCoordX * XSIZE * CELL_SCALE_METER) + static_cast<GLfloat>(iPatchStartX * CELL_SCALE_METER);
 	GLfloat fZ = static_cast<GLfloat>(m_iTerrCoordZ * ZSIZE * CELL_SCALE_METER) + static_cast<GLfloat>(iPatchStartZ * CELL_SCALE_METER);
-	GLfloat fPatchSizeMeters = PATCH_XSIZE * CELL_SCALE_METER;
+	GLfloat fPatchXSizeMeters = PATCH_XSIZE * CELL_SCALE_METER;
+	GLfloat fPatchZSizeMeters = PATCH_ZSIZE * CELL_SCALE_METER;
+
+	TBoundingBox patchBox{};
+	patchBox.v3Min = SVector3Df(fX, 0.0f, fZ);
+	patchBox.v3Max = SVector3Df(fX + fPatchXSizeMeters, 0.0f, fZ + fPatchZSizeMeters);
 
 	GLfloat fOrigX = fX;
 	GLfloat fOrigZ = fZ;
 
 	std::vector<TTerrainVertex>& rPatchVertices = rPatch.GetPatchVertices();
 	rPatchVertices.clear();
-
 	GLint iTerrainVertexCount = 0;
-	SVector3Df v3VertexPos {};
+
+	// Water Work
+	std::vector<TTerrainWaterVertex>& rPatchWaterVertices = rPatch.GetPatchWaterVertices();
+	std::vector<GLuint>& rPatchWaterIndices = rPatch.GetPatchWaterIndices();
+	rPatchWaterVertices.clear();
+	rPatchWaterIndices.clear();
+
+	GLint iWaterVertexCount = 0;
+	bool bPatchHasWater = false;
+	const GLfloat fOpaqueWaterDepth = 1.0f;
+	const GLfloat fOOOpaqueWaterDepth = 1.0f / fOpaqueWaterDepth;
+	const GLfloat fTransparentWaterDepth = 0.8f * fOpaqueWaterDepth;
 
 	for (GLint iZ = iPatchStartZ; iZ <= iPatchStartZ + PATCH_ZSIZE; iZ++)
 	{
 		GLfloat* pHeight = fHeightPtr;
+		GLubyte* pWater = ubWaterPtr;
 
 		fX = fOrigX;
 
@@ -240,40 +833,359 @@ void CTerrain::CalculateTerrainPatch(GLint iPatchNumX, GLint iPatchNumZ)
 
 			GLfloat fHeight = (*pHeight++);
 
-			v3VertexPos.x = fX;
-			v3VertexPos.y = fHeight;
-			v3VertexPos.z = fZ;
+			// complete bonuding box with height
+			if (fHeight > -999999.0f)
+			{
+				patchBox.v3Max.y = fHeight;
+			}
+			if (fHeight < 999999.0f)
+			{
+				patchBox.v3Min.y = fHeight;
+			}
 
-			// Create vertex
+			// Create Terrain vertex
 			TTerrainVertex vertex;
-			vertex.m_v3Position = v3VertexPos;
-			vertex.m_v3Normals = SVector3Df(0.0f);
+			vertex.m_v3Position = SVector3Df(fX, fHeight, fZ);
+			vertex.m_v2TexCoords = SVector2Df((fX - fOrigX) / fPatchXSizeMeters, (fZ - fOrigZ) / fPatchZSizeMeters);
+			vertex.m_v3Normals = SVector2Df(0.0f, 1.0f); // Default normal, will be recalculated later
 
-			GLfloat fPatchOriginX = fOrigX;
-			GLfloat fPatchOriginZ = fOrigZ;
-
-			vertex.m_v2TexCoords = SVector2Df((fX - fPatchOriginX) / fPatchSizeMeters, (fZ - fPatchOriginZ) / fPatchSizeMeters);
 			rPatchVertices.emplace_back(vertex);
 			iTerrainVertexCount++;
+
+			// Check water height
+			GLubyte ubNumWater = (*pWater++);
+
+			if (iX >= 0 && iZ >= 0 && iX < XSIZE && iZ < ZSIZE && (iPatchStartX + PATCH_XSIZE) != iX && (iPatchStartZ + PATCH_ZSIZE) != iZ)
+			{
+				if (ubNumWater != 0xFF)
+				{
+					GLfloat fWaterHeight = m_WaterData.m_fWaterHeight[ubNumWater];
+					if (fWaterHeight != FLT_MIN)
+					{
+						// Compute water depth at 4 corners of the terrain cell
+						// Clamp each to be within [0, fTransparentWaterDepth]
+						GLfloat fWaterTerrainHeightDifference0 = fWaterHeight - fHeight;
+						if (fWaterTerrainHeightDifference0 >= fTransparentWaterDepth)
+						{
+							fWaterTerrainHeightDifference0 = fTransparentWaterDepth;
+						}
+						if (fWaterTerrainHeightDifference0 <= 0.0f)
+						{
+							fWaterTerrainHeightDifference0 = 0.0f;
+						}
+
+						GLfloat fWaterTerrainHeightDifference1 = fWaterHeight - (*(pHeight + HEIGHTMAP_RAW_XSIZE - 1));
+						if (fWaterTerrainHeightDifference1 >= fTransparentWaterDepth)
+						{
+							fWaterTerrainHeightDifference1 = fTransparentWaterDepth;
+						}
+						if (fWaterTerrainHeightDifference1 <= 0.0f)
+						{
+							fWaterTerrainHeightDifference1 = 0.0f;
+						}
+
+						GLfloat fWaterTerrainHeightDifference2 = fWaterHeight - (*(pHeight));
+						if (fWaterTerrainHeightDifference2 >= fTransparentWaterDepth)
+						{
+							fWaterTerrainHeightDifference2 = fTransparentWaterDepth;
+						}
+						if (fWaterTerrainHeightDifference2 <= 0.0f)
+						{
+							fWaterTerrainHeightDifference2 = 0.0f;
+						}
+
+						GLfloat fWaterTerrainHeightDifference3 = fWaterHeight - (*(pHeight + HEIGHTMAP_RAW_XSIZE));
+						if (fWaterTerrainHeightDifference3 >= fTransparentWaterDepth)
+						{
+							fWaterTerrainHeightDifference3 = fTransparentWaterDepth;
+						}
+						if (fWaterTerrainHeightDifference3 <= 0.0f)
+						{
+							fWaterTerrainHeightDifference3 = 0.0f;
+						}
+
+						// -----------------------
+						// Convert depth to alpha (0 = fully transparent, 255 = fully opaque)
+						// Multiply by 255 and inverse max depth
+						// -----------------------
+
+						GLuint uiAlpha0 = static_cast<GLuint>(fWaterTerrainHeightDifference0 * fOOOpaqueWaterDepth * 255.0f);
+						GLuint uiAlpha1 = static_cast<GLuint>(fWaterTerrainHeightDifference1 * fOOOpaqueWaterDepth * 255.0f);
+						GLuint uiAlpha2 = static_cast<GLuint>(fWaterTerrainHeightDifference2 * fOOOpaqueWaterDepth * 255.0f);
+						GLuint uiAlpha3 = static_cast<GLuint>(fWaterTerrainHeightDifference3 * fOOOpaqueWaterDepth * 255.0f);
+
+						GLuint uiAlphaKey = (uiAlpha0 << 24) | (uiAlpha1 << 16) | (uiAlpha2 << 8) | uiAlpha3;
+
+						// -----------------------
+						// Skip water rendering if all alpha values are 0 (fully transparent)
+						// -----------------------
+						if (uiAlphaKey != 0)
+						{
+							// -----------------------
+							// Add 6 vertices (2 triangles) to form a quad water surface tile
+							// Each vertex shares the same height (water height)
+							// -----------------------
+
+							// Top Left
+							TTerrainWaterVertex vertex1{};
+							vertex1.m_v3Position = SVector3Df(fX, fWaterHeight, fZ); // Current fX, fZ
+							vertex1.m_v2TexCoords = SVector2Df((fX - fOrigX) / fPatchXSizeMeters, (fZ - fOrigZ) / fPatchZSizeMeters);
+							vertex1.m_v3Normals = SVector3Df(0.0f, 1.0f, 0.0f);
+							vertex1.m_uiColor = ((uiAlpha0 << 24) & 0xFF000000) | 0x00FFFFFF; // Alpha channel (consider which alpha corresponds to which corner)
+							rPatchWaterVertices.emplace_back(vertex1);
+
+							// Bottom-Left
+							TTerrainWaterVertex vertex2{};
+							vertex2.m_v3Position = SVector3Df(fX, fWaterHeight, fZ + static_cast<GLfloat>(CELL_SCALE_METER)); // fZ + CELL_SCALE_METER
+							vertex2.m_v2TexCoords = SVector2Df((fX - fOrigX) / fPatchXSizeMeters, (fZ + static_cast<GLfloat>(CELL_SCALE_METER) - fOrigZ) / fPatchZSizeMeters);
+							vertex2.m_v3Normals = SVector3Df(0.0f, 1.0f, 0.0f);
+							vertex2.m_uiColor = ((uiAlpha1 << 24) & 0xFF000000) | 0x00FFFFFF; // Adjust alpha mapping
+							rPatchWaterVertices.emplace_back(vertex2);
+
+							// Top-Right
+							TTerrainWaterVertex vertex3{};
+							vertex3.m_v3Position = SVector3Df(fX + static_cast<GLfloat>(CELL_SCALE_METER), fWaterHeight, fZ); // fX + CELL_SCALE_METER
+							vertex3.m_v2TexCoords = SVector2Df((fX + static_cast<GLfloat>(CELL_SCALE_METER) - fOrigX) / fPatchXSizeMeters, (fZ - fOrigZ) / fPatchZSizeMeters);
+							vertex3.m_v3Normals = SVector3Df(0.0f, 1.0f, 0.0f);
+							vertex3.m_uiColor = ((uiAlpha2 << 24) & 0xFF000000) | 0x00FFFFFF; // Adjust alpha mapping
+							rPatchWaterVertices.emplace_back(vertex3);
+
+							// Top-right (again for second triangle)
+							TTerrainWaterVertex vertex4{};
+							vertex4.m_v3Position = SVector3Df(fX + static_cast<GLfloat>(CELL_SCALE_METER), fWaterHeight, fZ); // fX + CELL_SCALE_METER
+							vertex4.m_v2TexCoords = SVector2Df((fX + static_cast<GLfloat>(CELL_SCALE_METER) - fOrigX) / fPatchXSizeMeters, (fZ - fOrigZ) / fPatchZSizeMeters);
+							vertex4.m_v3Normals = SVector3Df(0.0f, 1.0f, 0.0f);
+							vertex4.m_uiColor = ((uiAlpha2 << 24) & 0xFF000000) | 0x00FFFFFF; // Adjust alpha mapping
+							rPatchWaterVertices.emplace_back(vertex4);
+
+							// Bottom-left (again for second triangle)
+							TTerrainWaterVertex vertex5{};
+							vertex5.m_v3Position = SVector3Df(fX, fWaterHeight, fZ + static_cast<GLfloat>(CELL_SCALE_METER)); // fZ + CELL_SCALE_METER
+							vertex5.m_v2TexCoords = SVector2Df((fX - fOrigX) / fPatchXSizeMeters, (fZ + static_cast<GLfloat>(CELL_SCALE_METER) - fOrigZ) / fPatchZSizeMeters);
+							vertex5.m_v3Normals = SVector3Df(0.0f, 1.0f, 0.0f);
+							vertex5.m_uiColor = ((uiAlpha1 << 24) & 0xFF000000) | 0x00FFFFFF; // Adjust alpha mapping
+							rPatchWaterVertices.emplace_back(vertex5);
+
+							// Bottom-Right
+							TTerrainWaterVertex vertex6{};
+							vertex6.m_v3Position = SVector3Df(fX + static_cast<GLfloat>(CELL_SCALE_METER), fWaterHeight, fZ + static_cast<GLfloat>(CELL_SCALE_METER)); // fX + CELL_SCALE_METER, fZ + CELL_SCALE_METER
+							vertex6.m_v2TexCoords = SVector2Df((fX + static_cast<GLfloat>(CELL_SCALE_METER) - fOrigX) / fPatchXSizeMeters, (fZ + static_cast<GLfloat>(CELL_SCALE_METER) - fOrigZ) / fPatchZSizeMeters);
+							vertex6.m_v3Normals = SVector3Df(0.0f, 1.0f, 0.0f);
+							vertex6.m_uiColor = ((uiAlpha3 << 24) & 0xFF000000) | 0x00FFFFFF; // Adjust alpha mapping
+							rPatchWaterVertices.emplace_back(vertex6);
+
+							GLuint baseIndex = static_cast<GLuint>(rPatchWaterVertices.size()) - 6;
+
+							rPatchWaterIndices.push_back(baseIndex + 0);
+							rPatchWaterIndices.push_back(baseIndex + 1);
+							rPatchWaterIndices.push_back(baseIndex + 2);
+
+							rPatchWaterIndices.push_back(baseIndex + 3);
+							rPatchWaterIndices.push_back(baseIndex + 4);
+							rPatchWaterIndices.push_back(baseIndex + 5);
+
+							iWaterVertexCount += 6;
+							bPatchHasWater = true;
+							rPatch.SetWaterHeight(fWaterHeight);
+						}
+					}
+				}
+			}
 
 			fX += static_cast<GLfloat>(CELL_SCALE_METER);
 		}
 
 		fHeightPtr += HEIGHTMAP_RAW_XSIZE;
+		ubWaterPtr += WATERMAP_XSIZE;
 
 		fZ += static_cast<GLfloat>(CELL_SCALE_METER);
 	}
 
-	assert((PATCH_XSIZE + 1) * (PATCH_ZSIZE + 1) == iTerrainVertexCount);
+	assert(PATCH_VERTEX_COUNT == iTerrainVertexCount);
+
+	rPatch.SetIsWaterPatch(bPatchHasWater);
 
 	// Must Init Indices since it's removed from Generating GL State
-	rPatch.InitIndices();
+	rPatch.InitPatchIndices();
+	rPatch.CalculatePatchNormals();
 	rPatch.GenerateGLState();
+
+	// If the patch has water, add the water vertices
+	if (bPatchHasWater)
+	{
+		rPatch.GenerateWaterGLState();
+
+	}
+
+	// Set the bounding box for the patch
+	rPatch.SetBoundingBox(patchBox);
+	rPatch.SetPatchIndex(iPatchNum);
+
+	// Set the patch as updated
 	rPatch.SetUpdateNeed(false);
 }
 
+// Helper to calculate plane equation (nx*x + ny*y + nz*z + d = 0)
+// Point p on plane, normal n
+SVector4Df CTerrain::CalculateClipPlane(const SVector3Df& v4Normal, const SVector3Df& v3Point)
+{
+	float d = -v4Normal.dot(v3Point);
+	return SVector4Df(v4Normal.x, v4Normal.y, v4Normal.z, d);
+}
+
+// --- Main Render Loop Adjustment ---
+// The main loop should orchestrate the passes per patch
 void CTerrain::Render()
 {
+	// Loop through all terrain patches to find water patches
+	for (GLubyte bPatchNumZ = 0; bPatchNumZ < PATCH_ZCOUNT; bPatchNumZ++)
+	{
+		for (GLubyte bPatchNumX = 0; bPatchNumX < PATCH_XCOUNT; bPatchNumX++)
+		{
+			GLint iPatchNum = bPatchNumZ * PATCH_XCOUNT + bPatchNumX;
+			CTerrainPatch& rTerrainPatch = m_TerrainPatches[iPatchNum];
+
+			if (rTerrainPatch.IsWaterPatch())
+			{
+				// Perform reflection and refraction passes for THIS specific water patch
+				// Pass the patch's height to the rendering functions
+				RenderTerrainReflectionPass(rTerrainPatch.GetWaterHeight());
+				RenderTerrainRefractionPass(rTerrainPatch.GetWaterHeight());
+			}
+		}
+	}
+
+	glDisable(GL_CLIP_DISTANCE0);
+
+	// --- Draw Terrain to Main FBO ---
+	// Pass the current camera and the "no-op" clipping plane.
+	// This ensures the terrain shader receives a uniform, but it doesn't clip any geometry.
+	CWindow::Instance().GetFrameBuffer()->BindForWriting();
+	RenderPatches(CCameraManager::Instance().GetCurrentCameraRef(), SVector4Df(0.0f, 0.0f, 0.0f, 0.0f));
+
+	// --- Draw Water to Main FBO ---
+	// The water shader will now sample from the reflection/refraction FBOs
+	// that were populated in the earlier passes.
+	RenderWater();
+	CWindow::Instance().GetFrameBuffer()->UnBindWriting();
+
+}
+
+// --- Modified Reflection Pass ---
+// Now accepts the specific water height for the current patch
+void CTerrain::RenderTerrainReflectionPass(float fWaterHeight)
+{
+	// 1. Bind the Reflection FBO for writing
+	m_pOwnerTerrainMap->GetReflectionFBOPtr()->BindForWriting();
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	const CCamera& rOriginalCamera = CCameraManager::Instance().GetCurrentCameraRef();
+	CCamera reflectionCamera = rOriginalCamera; // Start with a copy of the original camera
+
+	// Mirror the camera position across THIS specific water patch's plane
+	SVector3Df v3OriginalCamPos = rOriginalCamera.GetPosition();
+	SVector3Df v3ReflectedCamPos = v3OriginalCamPos;
+	v3ReflectedCamPos.y = fWaterHeight - (v3OriginalCamPos.y - fWaterHeight);
+	reflectionCamera.SetPosition(v3ReflectedCamPos);
+
+	reflectionCamera.InvertCameraPitch();
+
+	// --- Define the clipping plane for THIS reflection pass ---
+	// Clip geometry *below* this water patch's surface.
+	SVector3Df v3PlaneNormal(0.0f, 1.0f, 0.0f); // Points upwards
+	// Offset slightly above this water patch's level to avoid artifacts
+	SVector3Df v3PointOnPlane(0.0f, fWaterHeight + 0.1f, 0.0f); // Use the provided waterHeight
+	SVector4Df v4ReflectionClipPlane = CalculateClipPlane(v3PlaneNormal, v3PointOnPlane);
+
+	// Enable clipping and change culling for reflection pass
+	glEnable(GL_CLIP_DISTANCE0);
+	glCullFace(GL_FRONT);
+
+	// Render the terrain using the reflected camera and specific clipping plane
+	// Make sure RenderPatches (or terrain.draw()) uses the passed camera and clip plane
+	// (This requires modifying `terrain.draw()` or a helper to pass these arguments,
+	// as per my previous answer's `RenderPatches(camera, clipPlane)` suggestion)
+	RenderPatches(reflectionCamera, v4ReflectionClipPlane); // Pass specific camera & clip plane
+
+	// Render reflection-specific volumetric clouds (if they should be clipped too)
+	// This `reflectionVolumetricClouds.draw()` should also use the reflection camera and clip plane.
+	// You might need a `draw(camera, clipPlane)` overload for it.
+	// For now, let's assume it handles its own camera and clipping.
+	// If clouds should *not* be clipped (i.e., you see the whole sky reflection)
+	// then draw them *before* enabling GL_CLIP_DISTANCE0.
+
+	CWindow::Instance().GetSkyBox()->Render(reflectionCamera);
+
+	// Restore culling and disable clipping
+	glCullFace(GL_BACK);
+	glDisable(GL_CLIP_DISTANCE0);
+
+	m_pOwnerTerrainMap->GetReflectionFBOPtr()->UnBindWriting();
+}
+
+void CTerrain::RenderTerrainRefractionPass(float fWaterHeight)
+{
+	// 1. Bind the Refraction FBO for writing
+	m_pOwnerTerrainMap->GetRefractionFBOPtr()->BindForWriting();
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear refraction FBO
+
+	const CCamera& rOriginalCamera = CCameraManager::Instance().GetCurrentCameraRef();
+	// For refraction, we use the original camera.
+
+	// --- Define the clipping plane for THIS refraction pass ---
+	// Clip geometry *above* this water patch's surface.
+	SVector3Df v3PlaneNormal(0.0f, -1.0f, 0.0f); // Points downwards
+	// Offset slightly below this water patch's level to avoid artifacts
+	SVector3Df v3PointOnPlane(0.0f, fWaterHeight - 0.1f, 0.0f); // Use the provided waterHeight
+	SVector4Df v4RefractionClipPlane = CalculateClipPlane(v3PlaneNormal, v3PointOnPlane);
+
+	glEnable(GL_CLIP_DISTANCE0); // Enable clipping plane 0
+
+	// Render the terrain using the original camera and specific clipping plane
+	RenderPatches(rOriginalCamera, v4RefractionClipPlane); // Pass specific camera & clip plane
+	CWindow::Instance().GetSkyBox()->Render(rOriginalCamera);
+
+	glDisable(GL_CLIP_DISTANCE0); // Disable clipping plane 0
+
+	// 3. Unbind the Refraction FBO
+	m_pOwnerTerrainMap->GetRefractionFBOPtr()->UnBindWriting();
+}
+
+void CTerrain::RenderPatches(const CCamera& renderCam, const SVector4Df& v4ClipPlane)
+{
+	CShader* pShader = m_pOwnerTerrainMap->GetTerrainShaderPtr();
+	pShader->Use();
+
+	CMatrix4Df matVewProj = renderCam.GetViewProjMatrix();
+	SVector3Df v3CamPos = renderCam.GetPosition();
+
+	// Vertex Shader
+	pShader->setMat4("u_matViewProjection", matVewProj);
+
+	// Tessellation Control Shader
+	pShader->setVec3("u_v3CameraPos", v3CamPos);
+	pShader->setFloat("u_fTessMultiplier", 0.5f);
+
+	// Tessellation Evaluation Shader
+	pShader->setMat4("u_mat4ViewProj", matVewProj);
+	pShader->setVec3("u_v3CameraPos", v3CamPos);
+
+	pShader->setVec4("u_v4ClipPlane", v4ClipPlane.x, v4ClipPlane.y, v4ClipPlane.z, v4ClipPlane.w);
+
+	// Fragment Shader
+	pShader->setBindlessSampler2D("splatWeightMap", m_SplatData.m_pWeightTexture->GetHandle());
+	pShader->setBindlessSampler2D("splatIndexMap", m_SplatData.m_pIndexTexture->GetHandle());
+	pShader->setVec2("u_v2TerrainWorldSize", TERRAIN_XSIZE, TERRAIN_ZSIZE);
+	pShader->setVec2("u_v2TerrainOrigin", static_cast<GLfloat>(m_iTerrCoordX * TERRAIN_XSIZE), static_cast<GLfloat>(m_iTerrCoordZ * TERRAIN_ZSIZE));
+	pShader->setInt("u_iMaxTexturesBlend", TILEMAP_BLEND_COUNT);
+
+	pShader->setBindlessSampler2D("attrsMap", m_AttrData.m_pAttrTexture->GetHandle());
+	pShader->setBindlessSampler2D("waterMap", m_WaterData.m_pWaterTexture->GetHandle());
+
+	pShader->setBool("u_DebugVisualizeBlend", false);
+	pShader->setBool("u_DebugVisualizeAttrMap", false);
+	pShader->setBool("u_DebugVisualizeWater", false);
+
 	for (GLubyte bPatchNumZ = 0; bPatchNumZ < PATCH_ZCOUNT; bPatchNumZ++)
 	{
 		for (GLubyte bPatchNumX = 0; bPatchNumX < PATCH_XCOUNT; bPatchNumX++)
@@ -287,6 +1199,71 @@ void CTerrain::Render()
 	}
 }
 
+void CTerrain::RenderWater()
+{
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	auto pCamera = CCameraManager::Instance().GetCurrentCamera();
+	CMatrix4Df matVewProj = pCamera->GetViewProjMatrix();
+	SVector3Df v3CamPos = pCamera->GetPosition();
+
+	// Water Rendering
+	CShader* pWaterShader = m_pOwnerTerrainMap->GetWaterShaderPtr();
+
+	pWaterShader->Use();
+	pWaterShader->setMat4("ViewProjectionMatrix", matVewProj);
+	pWaterShader->setVec3("u_v3CameraPosition", v3CamPos);
+
+	auto pSkyBox = CWindow::Instance().GetSkyBox();
+
+	SVector3Df v3LightPos = pSkyBox->GetLightPos();// - CCameraManager::Instance().GetCurrentCamera()->GetPosition());
+	SVector3Df v3LightDir = pSkyBox->GetLightDir();
+	v3LightDir.normalize();
+
+	pWaterShader->setVec3("v3LightDirection", v3LightDir);
+	pWaterShader->setVec3("v3LightColor", pSkyBox->GetLightColor());
+	pWaterShader->setVec3("v3LightPos", v3LightPos);
+
+	pWaterShader->setInt("DUDVMapTexture", 0);
+	pWaterShader->setInt("NormalMapTexture", 1);
+	pWaterShader->setInt("ReflectionTexture", 2);
+	pWaterShader->setInt("RefractionTexture", 3);
+	pWaterShader->setInt("DepthMapTexture", 4);
+
+	GLfloat waveSpeed = 0.25f / 1.5f;
+	GLfloat time = static_cast<GLfloat>(glfwGetTime());
+
+	GLfloat moveFactor = waveSpeed * time;
+	pWaterShader->setFloat("u_fMoveFactor", moveFactor);
+	pWaterShader->setFloat("fTiling", 6.0f);
+
+
+	// Bind common textures once
+	m_pOwnerTerrainMap->GetWaterDudvTexPtr()->Bind(GL_TEXTURE0);
+	m_pOwnerTerrainMap->GetWaterNormalTexPtr()->Bind(GL_TEXTURE1);
+	m_pOwnerTerrainMap->GetReflectionFBOPtr()->BindTextureForReading(GL_TEXTURE2);
+	m_pOwnerTerrainMap->GetRefractionFBOPtr()->BindTextureForReading(GL_TEXTURE3);
+	m_pOwnerTerrainMap->GetRefractionFBOPtr()->BindDepthForReading(GL_TEXTURE4);
+
+	for (GLubyte bPatchNumZ = 0; bPatchNumZ < PATCH_ZCOUNT; bPatchNumZ++)
+	{
+		for (GLubyte bPatchNumX = 0; bPatchNumX < PATCH_XCOUNT; bPatchNumX++)
+		{
+			GLint iPatchNum = bPatchNumZ * PATCH_XCOUNT + bPatchNumX;
+
+			CTerrainPatch& rTerrainPatch = m_TerrainPatches[iPatchNum];
+			// Render the patch with the selected LOD
+			if (rTerrainPatch.IsWaterPatch())
+			{
+				rTerrainPatch.RenderWater();
+			}
+		}
+	}
+
+	glDisable(GL_BLEND);
+}
+
 CTerrainPatch* CTerrain::GetTerrainPatchPtr(GLint iPatchNumX, GLint iPatchNumZ)
 {
 	if (iPatchNumX >= PATCH_XCOUNT || iPatchNumZ >= PATCH_ZCOUNT)
@@ -296,6 +1273,11 @@ CTerrainPatch* CTerrain::GetTerrainPatchPtr(GLint iPatchNumX, GLint iPatchNumZ)
 	}
 
 	return &m_TerrainPatches[iPatchNumX * PATCH_XCOUNT + iPatchNumZ];
+}
+
+SVector2Df CTerrain::GetWorldOrigin() const
+{
+	return (SVector2Df(m_iTerrCoordX * TERRAIN_XSIZE, m_iTerrCoordZ * TERRAIN_ZSIZE));
 }
 
 void CTerrain::GetTerrainCoords(GLint* ipX, GLint* ipZ)
@@ -342,7 +1324,7 @@ GLint CTerrain::GetTerrainNumber() const
 
 GLfloat CTerrain::GetHeightMapValue(GLint iX, GLint iZ)
 {
-	return (m_fHeightMap.Get(iX + 1, iZ + 1));
+	return (m_fHeightMap.Get(iX, iZ));
 }
 
 GLfloat CTerrain::GetHeightMapValue(GLfloat fX, GLfloat fZ)
@@ -350,7 +1332,7 @@ GLfloat CTerrain::GetHeightMapValue(GLfloat fX, GLfloat fZ)
 	GLint iX = static_cast<GLint>(fX);
 	GLint iZ = static_cast<GLint>(fZ);
 
-	return (m_fHeightMap.Get(iX + 1, iZ + 1));
+	return (m_fHeightMap.Get(iX, iZ));
 }
 
 CGrid<GLfloat>& CTerrain::GetHeightMap()
@@ -453,73 +1435,48 @@ GLfloat CTerrain::GetHeightMapValueGlobalNew(GLfloat fX, GLfloat fZ)
 	const GLfloat fXSize = XSIZE;
 	const GLfloat fZSize = ZSIZE;
 
-	const GLint iBaseX = static_cast<GLint>(floor(fX));
-	const GLint iBaseZ = static_cast<GLint>(floor(fZ));
+	// If inside current terrain, return directly
+	if (fX >= 0 && fZ >= 0 && fX < fHeightMapXSize && fZ < fHeightMapZSize)
+		return GetHeightMapValue(fX, fZ);
 
-	const GLfloat fFracX = fX - iBaseX;
-	const GLfloat fFracZ = fZ - iBaseZ;
+	// Determine which neighbor terrain (if any) this coordinate belongs to
+	GLint neighborCoordX = m_iTerrCoordX;
+	GLint neighborCoordZ = m_iTerrCoordZ;
+	GLfloat localX = fX;
+	GLfloat localZ = fZ;
 
-	// Sample 4 surrounding heights
-	auto Sample = [&](GLint iOffsetX, GLint iOffsetZ) -> GLfloat
-		{
-			GLint iGlobalX = iBaseX + iOffsetX;
-			GLint iGlobalZ = iBaseZ + iOffsetZ;
+	if (fX < 0) {
+		neighborCoordX -= 1;
+		localX += fXSize;
+	}
+	else if (fX >= fHeightMapXSize) {
+		neighborCoordX += 1;
+		localX -= fXSize;
+	}
 
-			// Determine which terrain this coordinate belongs to
-			GLint iTerrainCoordX = m_iTerrCoordX;
-			GLint iTerrainCoordZ = m_iTerrCoordZ;
-			GLfloat fLocalX = static_cast<GLfloat>(iGlobalX);
-			GLfloat fLocalZ = static_cast<GLfloat>(iGlobalZ);
+	if (fZ < 0) {
+		neighborCoordZ -= 1;
+		localZ += fZSize;
+	}
+	else if (fZ >= fHeightMapZSize) {
+		neighborCoordZ += 1;
+		localZ -= fZSize;
+	}
 
-			if (iGlobalX < 0)
-			{
-				iTerrainCoordX -= 1;
-				fLocalX += fXSize;
-			}
-			else if (iGlobalX >= HEIGHTMAP_RAW_XSIZE)
-			{
-				iTerrainCoordX += 1;
-				fLocalX -= fXSize;
-			}
+	// Try to get the neighbor terrain number
+	GLint neighborTerrainNum;
+	if (GetTerrainMapOwner()->GetTerrainNumByCoord(neighborCoordX, neighborCoordZ, &neighborTerrainNum)) {
+		CTerrain* pNeighbor = nullptr;
+		if (GetTerrainMapOwner()->GetTerrainPtr(neighborTerrainNum, &pNeighbor)) {
+			return pNeighbor->GetHeightMapValue(localX, localZ);
+		}
+	}
 
-			if (iGlobalZ < 0)
-			{
-				iTerrainCoordZ -= 1;
-				fLocalZ += fZSize;
-			}
-			else if (iGlobalZ >= HEIGHTMAP_RAW_ZSIZE)
-			{
-				iTerrainCoordZ += 1;
-				fLocalZ -= fZSize;
-			}
-
-			// Fetch the correct terrain
-			GLint iNeighborTerrainNum;
-			if (GetTerrainMapOwner()->GetTerrainNumByCoord(iTerrainCoordX, iTerrainCoordZ, &iNeighborTerrainNum))
-			{
-				CTerrain* pTerrain = nullptr;
-				if (GetTerrainMapOwner()->GetTerrainPtr(iNeighborTerrainNum, &pTerrain))
-				{
-					return pTerrain->GetHeightMapValue(fLocalX, fLocalZ);
-				}
-			}
-
-			// Fallback: clamp to edge of current terrain
-			return GetHeightMapValue(
-				std::clamp(fLocalX, 0.0f, fHeightMapXSize - 1),
-				std::clamp(fLocalZ, 0.0f, fHeightMapZSize - 1));
-		};
-
-	// Sample 4 surrounding points
-	GLfloat h00 = Sample(0, 0);  // (baseX, baseZ)
-	GLfloat h10 = Sample(1, 0);  // (baseX+1, baseZ)
-	GLfloat h01 = Sample(0, 1);  // (baseX, baseZ+1)
-	GLfloat h11 = Sample(1, 1);  // (baseX+1, baseZ+1)
-
-	// Bilinear interpolation
-	GLfloat h0 = (1 - fFracX) * h00 + fFracX * h10;
-	GLfloat h1 = (1 - fFracX) * h01 + fFracX * h11;
-	return (1 - fFracZ) * h0 + fFracZ * h1;
+	// Fallback: clamp to edge of current terrain
+	return GetHeightMapValue(
+		std::clamp(fX, 0.0f, fHeightMapXSize - 1),
+		std::clamp(fZ, 0.0f, fHeightMapZSize - 1)
+	);
 }
 
 //#pragma warning(push)
@@ -546,8 +1503,6 @@ GLfloat CTerrain::GetHeightMapValueGlobal(GLfloat fX, GLfloat fZ)
 		sys_err("CTerrain::GetHeightMapValueGlobal : Can't Get TerrainNum from Coord %d, %d", m_iTerrCoordX, m_iTerrCoordZ);
 		iTerrainNum = 0;
 	}
-
-	sys_log("Start Working on TerrainNum: %d (%d, %d) - (%.0f, %0.f)", iTerrainNum, m_iTerrCoordX, m_iTerrCoordZ, fX, fZ);
 
 	GLint iTerrainCountX, iTerrainCountZ;
 	GetTerrainMapOwner()->GetTerrainsCount(&iTerrainCountX, &iTerrainCountZ);
@@ -576,13 +1531,13 @@ GLfloat CTerrain::GetHeightMapValueGlobal(GLfloat fX, GLfloat fZ)
 					{
 						sys_log("GetTerrainPtr1 Getting Height From TerrainNum: %d", iTerrainNum - 1);
 						// Fetch height from left terrain, adjusting sX (sX < -1, so sX + XSIZE >= 0)
-						return pTerrain->GetHeightMapValue(fX + fXSize, -1.0f);
+						return pTerrain->GetHeightMapValue(fX + fXSize, 0.0f);
 					}
 					else
 					{
 						// Failed to get left terrain, use current terrain's bottom-left edge
 						sys_log("GetTerrainPtr1 Failed");
-						return (GetHeightMapValue(-1.0f, -1.0f));
+						return (GetHeightMapValue(0, 0));
 					}
 				}
 			}
@@ -592,7 +1547,7 @@ GLfloat CTerrain::GetHeightMapValueGlobal(GLfloat fX, GLfloat fZ)
 				// No terrain to the right or below, return height from bottom-right corner
 				if (m_iTerrCoordX >= iTerrainCountX - 1)
 				{
-					return (GetHeightMapValue(fHeightMapXSize - 1.0f, -1.0f));
+					return (GetHeightMapValue(fHeightMapXSize - 1.0f, 0.0f));
 				}
 				else
 				{
@@ -602,14 +1557,14 @@ GLfloat CTerrain::GetHeightMapValueGlobal(GLfloat fX, GLfloat fZ)
 						sys_log("GetTerrainPtr2 Getting Height From TerrainNum: %d", iTerrainNum + 1);
 
 						// Fetch height from right terrain, adjusting sX (sX >= HEIGHTMAP_RAW_XSIZE - 1, so sX - XSIZE < HEIGHTMAP_RAW_XSIZE)
-						return (pTerrain->GetHeightMapValue(fX - fXSize, -1.0f));
+						return (pTerrain->GetHeightMapValue(fX - fXSize, 0.0f));
 					}
 					else
 					{
 						sys_log("GetTerrainPtr2 Failed");
 
 						// Failed to get right terrain, use current terrain's bottom-right edge
-						return (GetHeightMapValue(fHeightMapXSize - 1.0f, -1.0f));
+						return (GetHeightMapValue(fHeightMapXSize - 1.0f, 0.0f));
 					}
 				}
 			}
@@ -633,14 +1588,14 @@ GLfloat CTerrain::GetHeightMapValueGlobal(GLfloat fX, GLfloat fZ)
 						sys_log("GetTerrainPtr3 Getting Height From TerrainNum: %d", iTerrainNum - 3);
 
 						// Fetch height from terrain below, adjusting sZ (sZ < -1, so sZ + ZSIZE >= 0)
-						return (pTerrain->GetHeightMapValue(-1.0f, fZ + fZSize));
+						return (pTerrain->GetHeightMapValue(0.0f, fZ + fZSize));
 					}
 					else
 					{
 						sys_log("GetTerrainPtr3 Failed");
 
 						// Failed to get terrain below, use current terrain's bottom-left edge
-						return (GetHeightMapValue(-1, -1));
+						return (GetHeightMapValue(0, 0));
 					}
 				}
 				// Terrain exists to the left and below, try below-left (byTerrainNum - 4)
@@ -658,7 +1613,7 @@ GLfloat CTerrain::GetHeightMapValueGlobal(GLfloat fX, GLfloat fZ)
 						sys_log("GetTerrainPtr4 Failed");
 
 						// Failed to get terrain below, use current terrain's bottom-left edge
-						return (GetHeightMapValue(-1, -1));
+						return (GetHeightMapValue(0, 0));
 					}
 				}
 			}
@@ -679,7 +1634,7 @@ GLfloat CTerrain::GetHeightMapValueGlobal(GLfloat fX, GLfloat fZ)
 						sys_log("GetTerrainPtr5 Failed");
 
 						// Failed to get terrain below, use current terrain's bottom-right edge
-						return (GetHeightMapValue(fHeightMapXSize - 1.0f, -1.0f));
+						return (GetHeightMapValue(fHeightMapXSize - 1.0f, 0.0f));
 					}
 				}
 				else
@@ -698,7 +1653,7 @@ GLfloat CTerrain::GetHeightMapValueGlobal(GLfloat fX, GLfloat fZ)
 						sys_log("GetTerrainPtr6 Failed");
 
 						// Failed to get below-right terrain, use current terrain's bottom-right edge
-						return (GetHeightMapValue(fHeightMapXSize - 1.0f, -1.0f));
+						return (GetHeightMapValue(fHeightMapXSize - 1.0f, 0.0f));
 					}
 				}
 			}
@@ -718,7 +1673,7 @@ GLfloat CTerrain::GetHeightMapValueGlobal(GLfloat fX, GLfloat fZ)
 					sys_log("GetTerrainPtr7 Failed");
 
 					// Failed to get terrain below, use current terrain's bottom edge at sX
-					return (GetHeightMapValue(fX, -1.0f));
+					return (GetHeightMapValue(fX, 0.0f));
 				}
 			}
 		}
@@ -734,7 +1689,7 @@ GLfloat CTerrain::GetHeightMapValueGlobal(GLfloat fX, GLfloat fZ)
 				if (m_iTerrCoordX <= 0)
 				{
 					// No terrain to the left or above, return height from top-left corner
-					return (GetHeightMapValue(-1, HEIGHTMAP_RAW_ZSIZE - 1));
+					return (GetHeightMapValue(0, HEIGHTMAP_RAW_ZSIZE - 1));
 				}
 				else
 				{
@@ -752,7 +1707,7 @@ GLfloat CTerrain::GetHeightMapValueGlobal(GLfloat fX, GLfloat fZ)
 						sys_log("GetTerrainPtr8 Failed");
 
 						// Failed to get left terrain, use current terrain's top-left edge
-						return (GetHeightMapValue(-1, HEIGHTMAP_RAW_ZSIZE - 1));
+						return (GetHeightMapValue(0, HEIGHTMAP_RAW_ZSIZE - 1));
 					}
 				}
 			}
@@ -801,14 +1756,14 @@ GLfloat CTerrain::GetHeightMapValueGlobal(GLfloat fX, GLfloat fZ)
 						sys_log("GetTerrainPtr10 Getting Height From TerrainNum: %d", iTerrainNum + 3);
 
 						// Fetch height from terrain above, adjusting sZ (sZ >= HEIGHTMAP_RAW_ZSIZE - 1, so sZ - ZSIZE < HEIGHTMAP_RAW_ZSIZE)
-						return (pTerrain->GetHeightMapValue(-1.0f, fZ - fZSize));
+						return (pTerrain->GetHeightMapValue(0.0f, fZ - fZSize));
 					}
 					else
 					{
 						sys_log("GetTerrainPtr10 Failed");
 
 						// Failed to get terrain above, use current terrain's top-left edge
-						return (GetHeightMapValue(-1, HEIGHTMAP_RAW_ZSIZE - 1));
+						return (GetHeightMapValue(0, HEIGHTMAP_RAW_ZSIZE - 1));
 					}
 				}
 				else
@@ -819,14 +1774,14 @@ GLfloat CTerrain::GetHeightMapValueGlobal(GLfloat fX, GLfloat fZ)
 						sys_log("GetTerrainPtr11 Getting Height From TerrainNum: %d", iTerrainNum + 2);
 
 						// Fetch height from terrain above, adjusting sZ (sZ >= HEIGHTMAP_RAW_YSIZE - 1, so sZ - YSIZE < HEIGHTMAP_RAW_YSIZE)
-						return (pTerrain->GetHeightMapValue(-1, HEIGHTMAP_RAW_ZSIZE - 1));
+						return (pTerrain->GetHeightMapValue(0, HEIGHTMAP_RAW_ZSIZE - 1));
 					}
 					else
 					{
 						sys_log("GetTerrainPtr11 Failed");
 
 						// Failed to get terrain above, use current terrain's top-left edge
-						return (GetHeightMapValue(-1, HEIGHTMAP_RAW_ZSIZE - 1));
+						return (GetHeightMapValue(0, HEIGHTMAP_RAW_ZSIZE - 1));
 					}
 				}
 			}
@@ -897,7 +1852,7 @@ GLfloat CTerrain::GetHeightMapValueGlobal(GLfloat fX, GLfloat fZ)
 			if (m_iTerrCoordX <= 0)
 			{
 				// No terrain to the left, return height from left edge at sZ
-				return (GetHeightMapValue(-1.0f, fZ));
+				return (GetHeightMapValue(0.0f, fZ));
 			}
 			else
 			{
@@ -913,7 +1868,7 @@ GLfloat CTerrain::GetHeightMapValueGlobal(GLfloat fX, GLfloat fZ)
 					sys_log("GetTerrainPtr15 Failed");
 
 					// Failed to get terrain above, use current terrain's left edge at sZ
-					return (GetHeightMapValue(-1.0f, fZ));
+					return (GetHeightMapValue(0.0f, fZ));
 				}
 			}
 		}
@@ -950,7 +1905,7 @@ GLfloat CTerrain::GetHeightMapValueGlobal(GLfloat fX, GLfloat fZ)
 		}
 	}
 
-	return (GetHeightMapValue(-1, -1));
+	return (GetHeightMapValue(0, 0));
 }
 
 //#pragma warning(pop)
@@ -965,6 +1920,185 @@ CTerrainMap* CTerrain::GetTerrainMapOwner()
 	return (m_pOwnerTerrainMap);
 }
 
+TTerrainSplatData& CTerrain::GetSplatData()
+{
+	return m_SplatData;
+}
+
+bool CTerrain::IsAttributeOn(GLint iX, GLint iZ, GLubyte ubAttrFlag)
+{
+	if (iX < 0 || iZ < 0)
+	{
+		sys_err("CTerrain::IsAttributeOn: Coordiantes Error! You can't pass negative values, positive range allowed (0 - %d)", ATTRMAP_XSIZE);
+		return (false);
+	}
+
+	if (iX >= ATTRMAP_XSIZE || iZ >= ATTRMAP_ZSIZE)
+	{
+		sys_err("CTerrain::IsAttributeOn: Coordiantes Error! You can't exceed map limtis, given coords (%d, %d) Max coords (%d - %d)", iX, iZ, ATTRMAP_XSIZE, ATTRMAP_ZSIZE);
+		return (false);
+	}
+
+	GLubyte ubAttrMap = m_AttrData.m_ubAttrMap[iZ * ATTRMAP_XSIZE + iX];
+
+	sys_log("CTerrain::IsAttributeOn: Result for (%d, %d) = %u - %u", iX, iZ, ubAttrMap, (ubAttrMap & ubAttrFlag));
+
+	if (ubAttrFlag < 16)
+	{
+		return (ubAttrMap & ubAttrFlag) ? true : false;
+	}
+	else
+	{
+		if (ubAttrFlag / 16 == ubAttrMap / 16)
+		{
+			return (true);
+		}
+		else
+		{
+			return (false);
+		}
+	}
+
+	return false;
+}
+
+GLubyte CTerrain::GetAttribute(GLint iX, GLint iZ)
+{
+	if (iX < 0 || iZ < 0)
+	{
+		sys_err("CTerrain::GetAttribute: Coordiantes Error! You can't pass negative values, positive range allowed (0 - %d)", ATTRMAP_XSIZE);
+		return (0);
+	}
+
+	if (iX >= ATTRMAP_XSIZE || iZ >= ATTRMAP_ZSIZE)
+	{
+		sys_err("CTerrain::GetAttribute: Coordiantes Error! You can't exceed map limtis, given coords (%d, %d) Max coords (%d - %d)", iX, iZ, ATTRMAP_XSIZE, ATTRMAP_ZSIZE);
+		return (0);
+	}
+
+	GLubyte ubAttrMap = m_AttrData.m_ubAttrMap[iZ * ATTRMAP_XSIZE + iX];
+	return (ubAttrMap);
+}
+
+void CTerrain::RecalculateWaterMap()
+{
+	// === Phase 1: Merge water entries with the same height ===
+	// Iterate through all water types and unify those that have identical heights.
+	for (GLubyte ubNumWaterFirst = 0; ubNumWaterFirst < m_WaterData.m_ubNumWater - 1; ubNumWaterFirst++)
+	{
+		// Skip invalid or deleted water entries
+		if (m_WaterData.m_fWaterHeight[ubNumWaterFirst] <= FLT_MIN)
+			continue;
+
+		// Compare this water entry with the rest
+		for (GLubyte ubNumWaterSecond = ubNumWaterFirst + 1; ubNumWaterSecond < m_WaterData.m_ubNumWater; ubNumWaterSecond++)
+		{
+			// Skip invalid or deleted water entries
+			if (m_WaterData.m_fWaterHeight[ubNumWaterSecond] <= FLT_MIN)
+				continue;
+
+			// If both waters have the same height, merge them
+			if (m_WaterData.m_fWaterHeight[ubNumWaterFirst] == m_WaterData.m_fWaterHeight[ubNumWaterSecond])
+			{
+				// Replace all occurrences of ubNumWaterSecond in the map with ubNumWaterFirst
+				for (GLint iDepth = 0; iDepth < WATERMAP_ZSIZE; iDepth++)
+				{
+					// Iterate through the water map and replace second water number with first
+					for (GLint iWidth = 0; iWidth < WATERMAP_XSIZE; iWidth++)
+					{
+						// Check if the second water number matches the current cell
+						if (ubNumWaterSecond == m_WaterData.m_ubWaterMap[iDepth * WATERMAP_ZSIZE + iWidth])
+						{
+							// Replace second water number with first
+							m_WaterData.m_ubWaterMap[iDepth * WATERMAP_XSIZE + iWidth] = ubNumWaterFirst;
+						}
+					}
+				}
+
+				// Mark the second water index as deleted
+				m_WaterData.m_fWaterHeight[ubNumWaterSecond] = FLT_MIN;
+			}
+		}
+	}
+
+	// === Phase 2: Count how many cells are using each water number ===
+	GLubyte ubLocalNumWater[MAX_WATER_NUM];
+	arr_mem_zero(ubLocalNumWater);
+
+	// Count occurrences of each water type in the water map
+	for (GLint iDepth = 0; iDepth < WATERMAP_ZSIZE; iDepth++)
+	{
+		for (GLint iWidth = 0; iWidth < WATERMAP_XSIZE; iWidth++)
+		{
+			GLubyte ubWaterNum = m_WaterData.m_ubWaterMap[iDepth * WATERMAP_XSIZE + iWidth];
+			if (ubWaterNum != 0xFF && ubWaterNum < MAX_WATER_NUM)
+			{
+				// Increment the count for this water number
+				ubLocalNumWater[ubWaterNum]++;
+			}
+		}
+	}
+
+	// === Phase 3: Compact water numbers and shift all valid water types to the front ===
+	GLubyte ubNumWaterCalcualte = 0;
+	GLubyte ubNumWaterSecond;
+
+	for (GLubyte ubNumWaterFirst = 0; ubNumWaterFirst < MAX_WATER_NUM; ubNumWaterFirst++)
+	{
+		if (ubLocalNumWater[ubNumWaterFirst] == 0) // This water type is unused
+		{
+			bool bWaterFound = false;
+
+			// Look for the next used water index after ubNumWaterFirst
+			for (ubNumWaterSecond = ubNumWaterFirst + 1; ubNumWaterSecond < MAX_WATER_NUM; ubNumWaterSecond++)
+			{
+				if (ubLocalNumWater[ubNumWaterFirst] != 0)
+				{
+					bWaterFound = true;
+					break;
+				}
+				else
+				{
+					// Clean up unused heights
+					m_WaterData.m_fWaterHeight[ubNumWaterSecond] = FLT_MIN; // Mark as deleted
+				}
+			}
+
+			if (!bWaterFound)
+			{
+				// Nothing more to compact, mark the remaining slot as deleted
+				m_WaterData.m_fWaterHeight[ubNumWaterFirst] = FLT_MIN; // Mark as deleted
+				break; // No more waters to process
+			}
+
+			// Remap all occurrences of ubNumWaterSecond to ubNumWaterFirst
+			for (GLint iDepth = 0; iDepth < WATERMAP_ZSIZE; iDepth++)
+			{
+				for (GLint iWidth = 0; iWidth < WATERMAP_XSIZE; iWidth++)
+				{
+					// Check if the current cell has the first water number
+					if (ubNumWaterSecond == m_WaterData.m_ubWaterMap[iDepth * WATERMAP_XSIZE + iWidth])
+					{
+						// Replace it with the next valid water number
+						m_WaterData.m_ubWaterMap[iDepth * WATERMAP_XSIZE + iWidth] = ubNumWaterFirst;
+					}
+				}
+			}
+
+			// Move the water height value
+			m_WaterData.m_fWaterHeight[ubNumWaterFirst] = m_WaterData.m_fWaterHeight[ubNumWaterSecond]; // Copy height from second to first
+			m_WaterData.m_fWaterHeight[ubNumWaterSecond] = FLT_MIN; // Mark second water as deleted
+		}
+		else
+		{
+			// Water entry was already in use, just count it
+			ubNumWaterCalcualte++; // Increment the count of valid waters
+		}
+	}
+
+	// Update total valid water entries
+	m_WaterData.m_ubNumWater = ubNumWaterCalcualte; // Update the total number of waters
+}
 
 void CTerrain::DrawHeightBrush(GLubyte bBrushShape, GLubyte bBrushType, GLint iCellx, GLint iCellZ, GLint iBrushSize, GLint iBrushStrength)
 {
@@ -995,20 +2129,360 @@ void CTerrain::DrawHeightBrush(GLubyte bBrushShape, GLubyte bBrushType, GLint iC
 	}
 }
 
+void CTerrain::DrawTextureBrush(GLubyte bBrushShape,
+	GLint iCellX, GLint iCellZ,
+	GLint iSubCellX, GLint iSubCellZ,
+	GLint iBrushSize, GLint iBrushStrength,
+	GLint iSelectedTextureIndex)
+{
+	// Compute exact brush center in sub-texel units
+	GLfloat fCenterX = static_cast<GLfloat>(iCellX * HEIGHT_TILE_XRATIO + iSubCellX);
+	GLfloat fCenterZ = static_cast<GLfloat>(iCellZ * HEIGHT_TILE_ZRATIO + iSubCellZ);
+
+	// Compute brush radius in texture space
+	GLint brushRadiusX = static_cast<GLint>(std::round(iBrushSize * HEIGHT_TILE_XRATIO));
+	GLint brushRadiusZ = static_cast<GLint>(std::round(iBrushSize * HEIGHT_TILE_ZRATIO));
+
+	for (GLint zOffset = -brushRadiusZ; zOffset <= brushRadiusZ; ++zOffset)
+	{
+		for (GLint xOffset = -brushRadiusX; xOffset <= brushRadiusX; ++xOffset)
+		{
+			// Compute grid position to modify
+			GLint x = static_cast<GLint>(fCenterX) + xOffset;
+			GLint z = static_cast<GLint>(fCenterZ) + zOffset;
+
+			// Bounds check
+			if (x < 0 || z < 0 || x >= TILEMAP_RAW_XSIZE || z >= TILEMAP_RAW_ZSIZE)
+				continue;
+
+			// Calculate falloff distance
+			GLfloat dx = static_cast<GLfloat>(x) + 0.5f - fCenterX;
+			GLfloat dz = static_cast<GLfloat>(z) + 0.5f - fCenterZ;
+			GLfloat distance = std::sqrt(dx * dx + dz * dz);
+
+			// Only paint inside circular brush
+			if (distance > static_cast<GLfloat>(brushRadiusX))
+				continue;
+
+			// Get current weight and index values
+			SVector4Df weights = m_SplatData.weightGrid.Get(x, z);
+			SVector4Di indices = m_SplatData.indexGrid.Get(x, z);
+
+			// Compute blend strength using falloff
+			GLfloat strength = static_cast<GLfloat>(iBrushStrength) / m_pOwnerTerrainMap->GetBrushMaxStrength();
+			GLfloat t = std::clamp(distance / static_cast<GLfloat>(brushRadiusX), 0.0f, 1.0f);
+			t = std::clamp(t, 0.0f, 1.0f);
+			GLfloat falloff = glm::smoothstep(1.0f, 0.0f, t); // OpenGL-style smoothstep
+			GLfloat blend = strength * falloff;
+			GLfloat influence = glm::clamp(strength * falloff, 0.0f, 1.0f);
+
+			// If texel is empty, assign selected texture
+			GLfloat totalWeight = weights.x + weights.y + weights.z + weights.w;
+			if (totalWeight < 1e-5f)
+			{
+				// Completely empty texel — reset everything
+				indices = SVector4Di(iSelectedTextureIndex, 0, 0, 0);
+				weights = SVector4Df(blend, 0.0f, 0.0f, 0.0f);
+			}
+			else
+			{
+				// Find or insert selected texture
+				GLint iTextureSlot = -1;
+				for (GLint i = 0; i < 4; i++)
+				{
+					if (indices[i] == iSelectedTextureIndex)
+					{
+						iTextureSlot = i;
+						break;
+					}
+				}
+
+				// Replace least used slot
+				if (iTextureSlot == -1)
+				{
+					iTextureSlot = 0;
+					GLfloat fMinWeight = weights[0];
+					for (GLint i = 0; i < 4; i++)
+					{
+						if (weights[i] < fMinWeight)
+						{
+							fMinWeight = weights[i];
+							iTextureSlot = i;
+						}
+					}
+
+					indices[iTextureSlot] = iSelectedTextureIndex;
+					weights[iTextureSlot] = 0.0f;  // Initialize new slot
+				}
+
+				for (GLint i = 0; i < 4; ++i)
+				{
+					if (i == iTextureSlot)
+					{
+						weights[i] = glm::mix(weights[i], 1.0f, influence);
+					}
+					else
+					{
+						weights[i] = glm::mix(weights[i], 0.0f, influence);
+
+						// Clear index if faded out completely
+						if (weights[i] < 0.01f)
+						{
+							indices[i] = 255;     // 255 = invalid / unused
+							weights[i] = 0.0f;
+						}
+					}
+				}
+
+				// Normalize
+				float sum = weights.r + weights.g + weights.b + weights.a;
+				if (sum > 0.0001f)
+				{
+					weights /= sum;
+				}
+
+			}
+			SetSplatTexel(x, z, weights, indices);
+		}
+	}
+
+	UpdateSplatsData();
+}
+
+
+void CTerrain::DrawAttributeBrush(GLbyte bBrushShape, GLubyte ubAttrType, GLint iCellX, GLint iCellZ, GLint iSubCellX, GLint iSubCellZ, GLint iBrushSize, GLint iBrushStrength, bool bEraseAttr)
+{
+	// Compute exact brush center in sub-texel units
+	GLfloat fCenterX = static_cast<GLfloat>(iCellX * HEIGHT_TILE_XRATIO + iSubCellX);
+	GLfloat fCenterZ = static_cast<GLfloat>(iCellZ * HEIGHT_TILE_ZRATIO + iSubCellZ);
+
+	// Compute brush radius in texture space
+	GLint brushRadiusX = static_cast<GLint>(std::round(iBrushSize * HEIGHT_TILE_XRATIO));
+	GLint brushRadiusZ = static_cast<GLint>(std::round(iBrushSize * HEIGHT_TILE_ZRATIO));
+
+	if (bBrushShape == BRUSH_SHAPE_CIRCLE)
+	{
+		for (GLint zOffset = -brushRadiusZ; zOffset <= brushRadiusZ; ++zOffset)
+		{
+			for (GLint xOffset = -brushRadiusX; xOffset <= brushRadiusX; ++xOffset)
+			{
+				GLint iX = static_cast<GLint>(fCenterX) + xOffset;
+				GLint iZ = static_cast<GLint>(fCenterZ) + zOffset;
+
+				if (iX < 0 || iZ < 0 || iX >= ATTRMAP_XSIZE || iZ >= ATTRMAP_ZSIZE)
+					continue;
+
+				GLfloat iX2 = static_cast<GLfloat>(iX) + 0.5f - fCenterX;
+				GLfloat iZ2 = static_cast<GLfloat>(iZ) + 0.5f - fCenterZ;
+				GLfloat fDist = std::sqrtf(iX2 * iX2 + iZ2 * iZ2);
+
+				GLfloat falloff = glm::smoothstep(1.0f, 0.0f, fDist / brushRadiusX);
+				if (falloff <= 0.0f)
+				{
+					continue;
+				}
+
+				if (bEraseAttr)
+				{
+					m_AttrData.m_ubAttrMap[iZ * ATTRMAP_XSIZE + iX] &= ~ubAttrType;
+				}
+				else
+				{
+					m_AttrData.m_ubAttrMap[iZ * ATTRMAP_XSIZE + iX] |= ubAttrType;
+				}
+			}
+		}
+
+	}
+	else if (bBrushShape == BRUSH_SHAPE_SQUARE)
+	{
+		for (GLint zOffset = -brushRadiusZ; zOffset <= brushRadiusZ; ++zOffset)
+		{
+			for (GLint xOffset = -brushRadiusX; xOffset <= brushRadiusX; ++xOffset)
+			{
+				GLint iX = static_cast<GLint>(fCenterX) + xOffset;
+				GLint iZ = static_cast<GLint>(fCenterZ) + zOffset;
+
+				if (iX < 0 || iZ < 0 || iX >= ATTRMAP_XSIZE || iZ >= ATTRMAP_ZSIZE)
+					continue;
+
+				if (bEraseAttr)
+				{
+					m_AttrData.m_ubAttrMap[iZ * ATTRMAP_XSIZE + iX] &= ~ubAttrType;
+				}
+				else
+				{
+					m_AttrData.m_ubAttrMap[iZ * ATTRMAP_XSIZE + iX] |= ubAttrType;
+				}
+			}
+		}
+	}
+
+	sys_log("Applied Attr Type : %u at (%0.f, %0.f)", ubAttrType, fCenterX, fCenterZ);
+
+	// Upload to GPU
+	UpdateAttrsData();
+}
+
+void CTerrain::DrawWaterBrush(GLbyte bBrushShape, GLint iCellX, GLint iCellZ, GLint iSubCellX, GLint iSubCellZ, GLint iBrushSize, GLint iBrushStrength, GLfloat fWaterHeight, bool bEraseWater)
+{
+	// Check if the water is exceeding the maximum allowed water
+	if (m_WaterData.m_ubNumWater >= MAX_WATER_NUM)
+	{
+		sys_err("CTerrain::DrawWaterBrush: m_WaterData.m_ubNumWater(%u) >= MAX_WATER_NUM(%d)", m_WaterData.m_ubNumWater, MAX_WATER_NUM);
+		return;
+	}
+
+	// Compute exact brush center in sub-texel units
+	GLfloat fCenterX = static_cast<GLfloat>(iCellX * HEIGHT_WATER_XRATIO + iSubCellX);
+	GLfloat fCenterZ = static_cast<GLfloat>(iCellZ * HEIGHT_WATER_ZRATIO + iSubCellZ);
+
+	// Compute brush radius in texture space
+	GLint brushRadiusX = static_cast<GLint>(std::round(iBrushSize * HEIGHT_WATER_XRATIO));
+	GLint brushRadiusZ = static_cast<GLint>(std::round(iBrushSize * HEIGHT_WATER_ZRATIO));
+
+	GLubyte ubWaterID = 0;
+	GLubyte ubSearchWaterID = 0;
+	for (ubSearchWaterID = 0; ubSearchWaterID < MAX_WATER_NUM; ++ubSearchWaterID)
+	{
+		if (m_WaterData.m_fWaterHeight[ubSearchWaterID] <= FLT_MIN)
+		{
+			break;
+		}
+	}
+	ubWaterID = ubSearchWaterID; // This is the new water ID to be used
+	m_WaterData.m_fWaterHeight[ubSearchWaterID] = fWaterHeight; // Set the water height for the new water entry
+	m_WaterData.m_ubNumWater++; // Increment the number of water entries
+
+	if (bBrushShape == BRUSH_SHAPE_CIRCLE)
+	{
+		for (GLint zOffset = -brushRadiusZ; zOffset <= brushRadiusZ; ++zOffset)
+		{
+			for (GLint xOffset = -brushRadiusX; xOffset <= brushRadiusX; ++xOffset)
+			{
+				GLint iX = static_cast<GLint>(fCenterX) + xOffset;
+				GLint iZ = static_cast<GLint>(fCenterZ) + zOffset;
+
+				if (iX < 0 || iZ < 0 || iX >= WATERMAP_XSIZE || iZ >= WATERMAP_ZSIZE)
+					continue;
+
+				GLfloat iX2 = static_cast<GLfloat>(iX) + 0.5f - fCenterX;
+				GLfloat iZ2 = static_cast<GLfloat>(iZ) + 0.5f - fCenterZ;
+				GLfloat fDist = std::sqrtf(iX2 * iX2 + iZ2 * iZ2);
+
+				GLfloat falloff = glm::smoothstep(1.0f, 0.0f, fDist / brushRadiusX);
+				if (falloff <= 0.0f)
+				{
+					continue;
+				}
+
+				GLint iOffset = iZ * WATERMAP_XSIZE + iX;
+
+				if (bEraseWater)
+				{
+					// Set Water value to 0xFF or 255 (no water)
+					if (m_WaterData.m_ubWaterMap[iOffset] != 0xFF)
+					{
+						m_WaterData.m_ubWaterMap[iOffset] = 0xFF;
+					}
+
+					// Update TerrainPatches
+					GLubyte ubPatchNumX = static_cast<GLint>(iX) / PATCH_XSIZE;
+					GLubyte ubPatchNumZ = static_cast<GLint>(iZ) / PATCH_ZSIZE;
+					m_TerrainPatches[ubPatchNumZ * PATCH_XCOUNT + ubPatchNumX].SetUpdateNeed(true);
+
+					// Update AttrMap to contain water as well
+					GLint iAttrToWaterRatio = ATTRMAP_XSIZE / WATERMAP_XSIZE;
+					m_AttrData.m_ubAttrMap[iZ * iAttrToWaterRatio * ATTRMAP_XSIZE + iX * iAttrToWaterRatio] &= ~(TERRAIN_ATTRIBUTE_WATER);
+					m_AttrData.m_ubAttrMap[iZ * iAttrToWaterRatio * ATTRMAP_XSIZE + (iX * iAttrToWaterRatio + 1)] &= ~(TERRAIN_ATTRIBUTE_WATER);
+					m_AttrData.m_ubAttrMap[(iZ * iAttrToWaterRatio + 1) * ATTRMAP_XSIZE + iX * iAttrToWaterRatio] &= ~(TERRAIN_ATTRIBUTE_WATER);
+					m_AttrData.m_ubAttrMap[(iZ * iAttrToWaterRatio + 1) * ATTRMAP_XSIZE + (iX * iAttrToWaterRatio + 1)] &= ~(TERRAIN_ATTRIBUTE_WATER);
+				}
+				else
+				{
+					m_WaterData.m_ubWaterMap[iOffset] = ubWaterID;
+
+					// Update TerrainPatches
+					GLubyte ubPatchNumX = static_cast<GLint>(iX) / PATCH_XSIZE;
+					GLubyte ubPatchNumZ = static_cast<GLint>(iZ) / PATCH_ZSIZE;
+					m_TerrainPatches[ubPatchNumZ * PATCH_XCOUNT + ubPatchNumX].SetUpdateNeed(true);
+
+					// Update AttrMap to contain water as well
+					GLint iAttrToWaterRatio = ATTRMAP_XSIZE / WATERMAP_XSIZE;
+					m_AttrData.m_ubAttrMap[iZ * iAttrToWaterRatio * ATTRMAP_XSIZE + iX * iAttrToWaterRatio] |= (TERRAIN_ATTRIBUTE_WATER);
+					m_AttrData.m_ubAttrMap[iZ * iAttrToWaterRatio * ATTRMAP_XSIZE + (iX * iAttrToWaterRatio + 1)] |= (TERRAIN_ATTRIBUTE_WATER);
+					m_AttrData.m_ubAttrMap[(iZ * iAttrToWaterRatio + 1) * ATTRMAP_XSIZE + iX * iAttrToWaterRatio] |= (TERRAIN_ATTRIBUTE_WATER);
+					m_AttrData.m_ubAttrMap[(iZ * iAttrToWaterRatio + 1) * ATTRMAP_XSIZE + (iX * iAttrToWaterRatio + 1)] |= (TERRAIN_ATTRIBUTE_WATER);
+				}
+			}
+		}
+	}
+	else if (bBrushShape == BRUSH_SHAPE_SQUARE)
+	{
+		for (GLint zOffset = -brushRadiusZ; zOffset <= brushRadiusZ; ++zOffset)
+		{
+			for (GLint xOffset = -brushRadiusX; xOffset <= brushRadiusX; ++xOffset)
+			{
+				GLint iX = static_cast<GLint>(fCenterX) + xOffset;
+				GLint iZ = static_cast<GLint>(fCenterZ) + zOffset;
+
+				if (iX < 0 || iZ < 0 || iX >= ATTRMAP_XSIZE || iZ >= ATTRMAP_ZSIZE)
+					continue;
+
+				GLint iOffset = iZ * WATERMAP_XSIZE + iX;
+
+				if (bEraseWater)
+				{
+					// Set Water value to 0xFF or 255 (no water)
+					if (m_WaterData.m_ubWaterMap[iOffset] != 0xFF)
+					{
+						m_WaterData.m_ubWaterMap[iOffset] = 0xFF;
+					}
+
+					// Update TerrainPatches
+					GLubyte ubPatchNumX = static_cast<GLint>(iX) / PATCH_XSIZE;
+					GLubyte ubPatchNumZ = static_cast<GLint>(iZ) / PATCH_ZSIZE;
+					m_TerrainPatches[ubPatchNumZ * PATCH_XCOUNT + ubPatchNumX].SetUpdateNeed(true);
+
+					// Update AttrMap to contain water as well
+					GLint iAttrToWaterRatio = ATTRMAP_XSIZE / WATERMAP_XSIZE;
+					m_AttrData.m_ubAttrMap[iZ * iAttrToWaterRatio * ATTRMAP_XSIZE + iX * iAttrToWaterRatio] &= ~(TERRAIN_ATTRIBUTE_WATER);
+					m_AttrData.m_ubAttrMap[iZ * iAttrToWaterRatio * ATTRMAP_XSIZE + (iX * iAttrToWaterRatio + 1)] &= ~(TERRAIN_ATTRIBUTE_WATER);
+					m_AttrData.m_ubAttrMap[(iZ * iAttrToWaterRatio + 1) * ATTRMAP_XSIZE + iX * iAttrToWaterRatio] &= ~(TERRAIN_ATTRIBUTE_WATER);
+					m_AttrData.m_ubAttrMap[(iZ * iAttrToWaterRatio + 1) * ATTRMAP_XSIZE + (iX * iAttrToWaterRatio + 1)] &= ~(TERRAIN_ATTRIBUTE_WATER);
+				}
+				else
+				{
+					m_WaterData.m_ubWaterMap[iOffset] = ubWaterID;
+
+					// Update TerrainPatches
+					GLubyte ubPatchNumX = static_cast<GLint>(iX) / PATCH_XSIZE;
+					GLubyte ubPatchNumZ = static_cast<GLint>(iZ) / PATCH_ZSIZE;
+					m_TerrainPatches[ubPatchNumZ * PATCH_XCOUNT + ubPatchNumX].SetUpdateNeed(true);
+
+					// Update AttrMap to contain water as well
+					GLint iAttrToWaterRatio = ATTRMAP_XSIZE / WATERMAP_XSIZE;
+					m_AttrData.m_ubAttrMap[iZ * iAttrToWaterRatio * ATTRMAP_XSIZE + iX * iAttrToWaterRatio] |= (TERRAIN_ATTRIBUTE_WATER);
+					m_AttrData.m_ubAttrMap[iZ * iAttrToWaterRatio * ATTRMAP_XSIZE + (iX * iAttrToWaterRatio + 1)] |= (TERRAIN_ATTRIBUTE_WATER);
+					m_AttrData.m_ubAttrMap[(iZ * iAttrToWaterRatio + 1) * ATTRMAP_XSIZE + iX * iAttrToWaterRatio] |= (TERRAIN_ATTRIBUTE_WATER);
+					m_AttrData.m_ubAttrMap[(iZ * iAttrToWaterRatio + 1) * ATTRMAP_XSIZE + (iX * iAttrToWaterRatio + 1)] |= (TERRAIN_ATTRIBUTE_WATER);
+				}
+			}
+		}
+	}
+
+	UpdateWaterData();
+	CalculateTerrainPatches();
+}
+
+
 void CTerrain::UpTerrain(GLubyte bBrushShape, GLint iX, GLint iZ, GLint iBrushSize, GLint iBrushStrength)
 {
-	GLfloat fCenterX, fCenterZ;
-	GLfloat fX2, fZ2;
-	GLfloat fHeight;
-	GLfloat fDelta;
-	GLfloat fDistance;
-	GLint iLeft, iTop;
+	GLfloat fCenterX = static_cast<GLfloat>(iX);
+	GLfloat fCenterZ = static_cast<GLfloat>(iZ);
 
-	fCenterX = static_cast<GLfloat>(iX);
-	fCenterZ = static_cast<GLfloat>(iZ);
-
-	iLeft = iX - iBrushSize;
-	iTop = iZ - iBrushSize;
+	GLint iLeft = iX - iBrushSize;
+	GLint iTop = iZ - iBrushSize;
 
 	GLfloat fBrushSize = static_cast<GLfloat>(iBrushSize);
 
@@ -1018,8 +2492,8 @@ void CTerrain::UpTerrain(GLubyte bBrushShape, GLint iX, GLint iZ, GLint iBrushSi
 		{
 			for (GLint i = 0; i < 2 * iBrushSize; i++)
 			{
-				fX2 = static_cast<GLfloat>(iLeft + i);
-				fZ2 = static_cast<GLfloat>(iTop + j);
+				GLfloat fX2 = static_cast<GLfloat>(iLeft + i);
+				GLfloat fZ2 = static_cast<GLfloat>(iTop + j);
 
 				if (fX2 < -1.0f || fX2 >= static_cast<GLfloat>(HEIGHTMAP_RAW_XSIZE) - 1.0f ||
 					fZ2 < -1.0f || fZ2 >= static_cast<GLfloat>(HEIGHTMAP_RAW_ZSIZE) - 1.0f)
@@ -1027,19 +2501,19 @@ void CTerrain::UpTerrain(GLubyte bBrushShape, GLint iX, GLint iZ, GLint iBrushSi
 					continue;
 				}
 
-				fDistance = std::sqrtf((fX2 - fCenterX) * (fX2 - fCenterX) + (fZ2 - fCenterZ) * (fZ2 - fCenterZ));
+				GLfloat fDistance = std::sqrtf((fX2 - fCenterX) * (fX2 - fCenterX) + (fZ2 - fCenterZ) * (fZ2 - fCenterZ));
 
 				if (fDistance < fBrushSize)
 				{
 					// FIXED FORMULA: Properly scaled by strength
-					fDelta = ((fBrushSize * fBrushSize) - (fDistance * fDistance)) * static_cast<GLfloat>(iBrushStrength) / 16.0f;
+					GLfloat fDelta = ((fBrushSize * fBrushSize) - (fDistance * fDistance)) * static_cast<GLfloat>(iBrushStrength) / 16.0f;
 
 					if (fDelta <= 0.0f)
 					{
 						fDelta = 0.0f;
 					}
 
-					fHeight = GetHeightMapValue(fX2, fZ2);
+					GLfloat fHeight = GetHeightMapValue(fX2, fZ2);
 					fHeight += fDelta;
 
 					PutTerrainHeightMap(fX2, fZ2, fHeight, false);
@@ -1047,22 +2521,17 @@ void CTerrain::UpTerrain(GLubyte bBrushShape, GLint iX, GLint iZ, GLint iBrushSi
 			}
 		}
 	}
+
+	CalculateTerrainPatches();
 }
 
 void CTerrain::DownTerrain(GLubyte bBrushShape, GLint iX, GLint iZ, GLint iBrushSize, GLint iBrushStrength)
 {
-	GLfloat fCenterX, fCenterZ;
-	GLfloat fX2, fZ2;
-	GLfloat fHeight;
-	GLfloat fDelta;
-	GLfloat fDistance;
-	GLint iLeft, iTop;
+	GLfloat fCenterX = static_cast<GLfloat>(iX);
+	GLfloat fCenterZ = static_cast<GLfloat>(iZ);
 
-	fCenterX = static_cast<GLfloat>(iX);
-	fCenterZ = static_cast<GLfloat>(iZ);
-
-	iLeft = iX - iBrushSize;
-	iTop = iZ - iBrushSize;
+	GLint iLeft = iX - iBrushSize;
+	GLint iTop = iZ - iBrushSize;
 
 	GLfloat fBrushSize = static_cast<GLfloat>(iBrushSize);
 
@@ -1072,8 +2541,8 @@ void CTerrain::DownTerrain(GLubyte bBrushShape, GLint iX, GLint iZ, GLint iBrush
 		{
 			for (GLint i = 0; i < 2 * iBrushSize; i++)
 			{
-				fX2 = static_cast<GLfloat>(iLeft + i);
-				fZ2 = static_cast<GLfloat>(iTop + j);
+				GLfloat fX2 = static_cast<GLfloat>(iLeft + i);
+				GLfloat fZ2 = static_cast<GLfloat>(iTop + j);
 
 				if (fX2 < -1.0f || fX2 >= static_cast<GLfloat>(HEIGHTMAP_RAW_XSIZE) - 1.0f ||
 					fZ2 < -1.0f || fZ2 >= static_cast<GLfloat>(HEIGHTMAP_RAW_ZSIZE) - 1.0f)
@@ -1081,19 +2550,19 @@ void CTerrain::DownTerrain(GLubyte bBrushShape, GLint iX, GLint iZ, GLint iBrush
 					continue;
 				}
 
-				fDistance = std::sqrtf((fX2 - fCenterX) * (fX2 - fCenterX) + (fZ2 - fCenterZ) * (fZ2 - fCenterZ));
+				GLfloat fDistance = std::sqrtf((fX2 - fCenterX) * (fX2 - fCenterX) + (fZ2 - fCenterZ) * (fZ2 - fCenterZ));
 
 				if (fDistance < fBrushSize)
 				{
 					// FIXED FORMULA: Properly scaled by strength
-					fDelta = ((fBrushSize * fBrushSize) - (fDistance * fDistance)) * static_cast<GLfloat>(iBrushStrength) / 16.0f;
+					GLfloat fDelta = ((fBrushSize * fBrushSize) - (fDistance * fDistance)) * static_cast<GLfloat>(iBrushStrength) / 16.0f;
 
 					if (fDelta <= 0.0f)
 					{
 						fDelta = 0.0f;
 					}
 
-					fHeight = GetHeightMapValue(fX2, fZ2);
+					GLfloat fHeight = GetHeightMapValue(fX2, fZ2);
 					fHeight -= fDelta;
 
 					PutTerrainHeightMap(fX2, fZ2, fHeight, false);
@@ -1101,127 +2570,24 @@ void CTerrain::DownTerrain(GLubyte bBrushShape, GLint iX, GLint iZ, GLint iBrush
 			}
 		}
 	}
-}
 
+	CalculateTerrainPatches();
+}
 
 void CTerrain::FlatTerrain(GLubyte bBrushShape, GLint iX, GLint iZ, GLint iBrushSize, GLint iBrushStrength)
 {
 	GLfloat fCenterX, fCenterZ;
-	GLfloat fX2, fZ2;
-	GLfloat fDistance;
-	GLfloat fTargetHeight = 0.0f, fHeight, fDelta;
-	GLint iLeft, iTop;
 
 	fCenterX = static_cast<GLfloat>(iX);
 	fCenterZ = static_cast<GLfloat>(iZ);
 
-	iLeft = iX - iBrushSize;
-	iTop = iZ - iBrushSize;
+	GLint iLeft = iX - iBrushSize;
+	GLint iTop = iZ - iBrushSize;
 
 	GLfloat fBrushSize = static_cast<GLfloat>(iBrushSize);
 
-	GLint iMyTerrainNum;
-	if (!m_pOwnerTerrainMap->GetTerrainNumByCoord(m_iTerrCoordX, m_iTerrCoordZ, &iMyTerrainNum))
-	{
-		return;
-	}
-
-	CTerrain* pTerrain;
-	if (iZ < 0)
-	{
-		if (iX < 0)
-		{
-			if (!m_pOwnerTerrainMap->GetTerrainPtr(iMyTerrainNum, &pTerrain))
-			{
-				return;
-			}
-
-			fTargetHeight = pTerrain->GetHeightMapValueGlobal(iX + XSIZE, iZ + ZSIZE);
-			sys_log("GetHeightMapValueGlobal1: %f - iNum: %d - ctualVal(%d, %d) PassedVal(%d, %d)", fTargetHeight, iMyTerrainNum, iX, iZ, iX + XSIZE, iZ + ZSIZE);
-		}
-		else if (iX > XSIZE)
-		{
-			if (!m_pOwnerTerrainMap->GetTerrainPtr(iMyTerrainNum, &pTerrain))
-			{
-				return;
-			}
-
-			fTargetHeight = pTerrain->GetHeightMapValueGlobal(iX - XSIZE, iZ + ZSIZE);
-			sys_log("GetHeightMapValueGlobal2: %f - iNum: %d - ActualVal(%d, %d) PassedVal(%d, %d)", fTargetHeight, iMyTerrainNum, iX, iZ, iX - XSIZE, iZ + ZSIZE);
-		}
-		else
-		{
-			if (!m_pOwnerTerrainMap->GetTerrainPtr(iMyTerrainNum, &pTerrain))
-			{
-				return;
-			}
-
-			fTargetHeight = pTerrain->GetHeightMapValueGlobal(iX, iZ + ZSIZE);
-			sys_log("GetHeightMapValueGlobal3: %f - iNum: %d - ActualVal(%d, %d) PassedVal(%d, %d)", fTargetHeight, iMyTerrainNum, iX, iZ, iX, iZ + ZSIZE);
-		}
-	}
-	else if (iZ > ZSIZE)
-	{
-		if (iX < 0)
-		{
-			if (!m_pOwnerTerrainMap->GetTerrainPtr(iMyTerrainNum, &pTerrain))
-			{
-				return;
-			}
-
-			fTargetHeight = pTerrain->GetHeightMapValueGlobal(iX + XSIZE, iZ - ZSIZE);
-			sys_log("GetHeightMapValueGlobal4: %f - iNum: %d - ActualVal(%d, %d) PassedVal(%d, %d)", fTargetHeight, iMyTerrainNum, iX, iZ, iX + XSIZE, iZ - ZSIZE);
-		}
-		else if (iX > XSIZE)
-		{
-			if (!m_pOwnerTerrainMap->GetTerrainPtr(iMyTerrainNum, &pTerrain))
-			{
-				return;
-			}
-
-			fTargetHeight = pTerrain->GetHeightMapValueGlobal(iX - XSIZE, iZ - ZSIZE);
-			sys_log("GetHeightMapValueGlobal5: %f - iNum: %d - ActualVal(%d, %d) PassedVal(%d, %d)", fTargetHeight, iMyTerrainNum, iX, iZ, iX - XSIZE, iZ - ZSIZE);
-		}
-		else
-		{
-			if (!m_pOwnerTerrainMap->GetTerrainPtr(iMyTerrainNum, &pTerrain))
-			{
-				return;
-			}
-
-			fTargetHeight = pTerrain->GetHeightMapValueGlobal(iX, iZ - ZSIZE);
-			sys_log("GetHeightMapValueGlobal6: %f - iNum: %d - ActualVal(%d, %d) PassedVal(%d, %d)", fTargetHeight, iMyTerrainNum, iX, iZ, iX, iZ - ZSIZE);
-		}
-	}
-	else
-	{
-		if (iX < 0)
-		{
-			if (!m_pOwnerTerrainMap->GetTerrainPtr(iMyTerrainNum, &pTerrain))
-			{
-				return;
-			}
-
-			fTargetHeight = pTerrain->GetHeightMapValueGlobal(iX + XSIZE, iZ);
-			sys_log("GetHeightMapValueGlobal7: %f - iNum: %d - ActualVal(%d, %d) PassedVal(%d, %d)", fTargetHeight, iMyTerrainNum, iX, iZ, iX + XSIZE, iZ);
-		}
-		else if (iX > XSIZE)
-		{
-			if (!m_pOwnerTerrainMap->GetTerrainPtr(iMyTerrainNum, &pTerrain))
-			{
-				return;
-			}
-
-			fTargetHeight = pTerrain->GetHeightMapValueGlobal(iX - XSIZE, iZ);
-			sys_log("GetHeightMapValueGlobal8: %f - iNum: %d - ActualVal(%d, %d) PassedVal(%d, %d)", fTargetHeight, iMyTerrainNum, iX, iZ, iX - XSIZE, iZ);
-		}
-		else
-		{
-			fTargetHeight = GetHeightMapValueGlobal(iX, iZ);
-			sys_log("GetHeightMapValueGlobal9: %f - iNum: %d - ActualVal(%d, %d) PassedVal(%d, %d)", fTargetHeight, iMyTerrainNum, iX, iZ, iX, iZ);
-		}
-	}
-
+	// 1. Sample target height ONCE from the brush center, using global accessor
+	GLfloat fTargetHeight = GetHeightMapValueGlobalNew(fCenterX, fCenterZ);
 	fTargetHeight = std::clamp(fTargetHeight, 0.0f, 100000.0f);
 
 	if (bBrushShape == BRUSH_SHAPE_CIRCLE)
@@ -1230,8 +2596,8 @@ void CTerrain::FlatTerrain(GLubyte bBrushShape, GLint iX, GLint iZ, GLint iBrush
 		{
 			for (GLint i = 0; i < 2 * iBrushSize; i++)
 			{
-				fX2 = static_cast<GLfloat>(iLeft + i);
-				fZ2 = static_cast<GLfloat>(iTop + j);
+				GLfloat fX2 = static_cast<GLfloat>(iLeft + i);
+				GLfloat fZ2 = static_cast<GLfloat>(iTop + j);
 
 				if (fX2 < -1.0f || fX2 >= static_cast<GLfloat>(HEIGHTMAP_RAW_XSIZE) - 1.0f ||
 					fZ2 < -1.0f || fZ2 >= static_cast<GLfloat>(HEIGHTMAP_RAW_ZSIZE) - 1.0f)
@@ -1239,40 +2605,35 @@ void CTerrain::FlatTerrain(GLubyte bBrushShape, GLint iX, GLint iZ, GLint iBrush
 					continue;
 				}
 
-				fDistance = std::sqrtf((fX2 - fCenterX) * (fX2 - fCenterX) + (fZ2 - fCenterZ) * (fZ2 - fCenterZ));
+				GLfloat fDistance = std::sqrtf((fX2 - fCenterX) * (fX2 - fCenterX) + (fZ2 - fCenterZ) * (fZ2 - fCenterZ));
 
 				if (fDistance < fBrushSize)
 				{
-					fHeight = GetHeightMapValue(fX2, fZ2);
+					GLfloat fHeight = GetHeightMapValue(fX2, fZ2);
 
-					// FIXED FORMULA: Properly scaled by strength
-					fDelta = ((fTargetHeight - fHeight) * static_cast<GLfloat>(iBrushStrength) / 250.0f);
-
+					// Use the same target height for all cells
+					GLfloat fDelta = ((fTargetHeight - fHeight) * static_cast<GLfloat>(iBrushStrength / m_pOwnerTerrainMap->GetBrushMaxStrength()));
 					fHeight += fDelta;
-
 					fHeight = std::clamp(fHeight, 0.0f, 100000.0f);
 
-					PutTerrainHeightMap(fX2, fZ2, fHeight);
+					PutTerrainHeightMap(fX2, fZ2, fHeight, true);
 				}
 			}
 		}
 	}
+
+	CalculateTerrainPatches();
 }
 
 void CTerrain::NoiseTerrain(GLubyte bBrushShape, GLint iX, GLint iZ, GLint iBrushSize, GLint iBrushStrength)
 {
 	GLfloat fCenterX, fCenterZ;
-	GLfloat fX2, fZ2;
-	GLfloat fHeight;
-	GLfloat fDelta;
-	GLfloat fDistance;
-	GLint iLeft, iTop;
 
 	fCenterX = static_cast<GLfloat>(iX);
 	fCenterZ = static_cast<GLfloat>(iZ);
 
-	iLeft = iX - iBrushSize;
-	iTop = iZ - iBrushSize;
+	GLint iLeft = iX - iBrushSize;
+	GLint iTop = iZ - iBrushSize;
 
 	GLfloat fBrushSize = static_cast<GLfloat>(iBrushSize);
 
@@ -1282,8 +2643,8 @@ void CTerrain::NoiseTerrain(GLubyte bBrushShape, GLint iX, GLint iZ, GLint iBrus
 		{
 			for (GLint i = 0; i < 2 * iBrushSize; i++)
 			{
-				fX2 = static_cast<GLfloat>(iLeft + i);
-				fZ2 = static_cast<GLfloat>(iTop + j);
+				GLfloat fX2 = static_cast<GLfloat>(iLeft + i);
+				GLfloat fZ2 = static_cast<GLfloat>(iTop + j);
 
 				if (fX2 < -1.0f || fX2 >= static_cast<GLfloat>(HEIGHTMAP_RAW_XSIZE) - 1.0f ||
 					fZ2 < -1.0f || fZ2 >= static_cast<GLfloat>(HEIGHTMAP_RAW_ZSIZE) - 1.0f)
@@ -1291,12 +2652,12 @@ void CTerrain::NoiseTerrain(GLubyte bBrushShape, GLint iX, GLint iZ, GLint iBrus
 					continue;
 				}
 
-				fDistance = std::sqrtf((fX2 - fCenterX) * (fX2 - fCenterX) + (fZ2 - fCenterZ) * (fZ2 - fCenterZ));
+				GLfloat fDistance = std::sqrtf((fX2 - fCenterX) * (fX2 - fCenterX) + (fZ2 - fCenterZ) * (fZ2 - fCenterZ));
 
 				if (fDistance < fBrushSize)
 				{
 					// FIXED FORMULA: Properly scaled by strength
-					fDelta = static_cast<GLfloat>(RANDOM() % iBrushStrength - (iBrushStrength / 2));
+					GLfloat fDelta = static_cast<GLfloat>(RANDOM() % iBrushStrength - (iBrushStrength / 2));
 
 					// Use Global accessors for stitching
 					GLfloat fHeight = GetHeightMapValue(fX2, fZ2);
@@ -1309,24 +2670,21 @@ void CTerrain::NoiseTerrain(GLubyte bBrushShape, GLint iX, GLint iZ, GLint iBrus
 			}
 		}
 	}
+
+	CalculateTerrainPatches();
 }
 
 void CTerrain::SmoothTerrain(GLubyte bBrushShape, GLint iX, GLint iZ, GLint iBrushSize, GLint iBrushStrength)
 {
 	GLfloat fCenterX, fCenterZ;
-	GLfloat fX2, fZ2;
-	GLfloat fHeight;
-	GLfloat fDelta;
-	GLfloat fDistance;
-	GLint iLeft, iTop;
-
-	GLfloat fXTop, fXBottom, fXLeft, fXRight, fYTop, fYBottom, fYLeft, fYRight, fZTop, fZBottom, fZLeft, fZRight;
 
 	fCenterX = static_cast<GLfloat>(iX);
 	fCenterZ = static_cast<GLfloat>(iZ);
 
-	iLeft = iX - iBrushSize;
-	iTop = iZ - iBrushSize;
+	GLfloat fXTop, fXBottom, fXLeft, fXRight, fYTop, fYBottom, fYLeft, fYRight, fZTop, fZBottom, fZLeft, fZRight;
+
+	GLint iLeft = iX - iBrushSize;
+	GLint iTop = iZ - iBrushSize;
 
 	GLfloat fBrushSize = static_cast<GLfloat>(iBrushSize);
 
@@ -1336,8 +2694,8 @@ void CTerrain::SmoothTerrain(GLubyte bBrushShape, GLint iX, GLint iZ, GLint iBru
 		{
 			for (GLint i = 0; i < 2 * iBrushSize; i++)
 			{
-				fX2 = static_cast<GLfloat>(iLeft + i);
-				fZ2 = static_cast<GLfloat>(iTop + j);
+				GLfloat fX2 = static_cast<GLfloat>(iLeft + i);
+				GLfloat fZ2 = static_cast<GLfloat>(iTop + j);
 
 				if (fX2 < -1.0f || fX2 >= static_cast<GLfloat>(HEIGHTMAP_RAW_XSIZE) - 1.0f ||
 					fZ2 < -1.0f || fZ2 >= static_cast<GLfloat>(HEIGHTMAP_RAW_ZSIZE) - 1.0f)
@@ -1354,39 +2712,44 @@ void CTerrain::SmoothTerrain(GLubyte bBrushShape, GLint iX, GLint iZ, GLint iBru
 				fZTop = fZ2 - 1.0f;
 				fZBottom = fZ2 + 1.0f;
 
-				fDistance = std::sqrtf((fX2 - fCenterX) * (fX2 - fCenterX) + (fZ2 - fCenterZ) * (fZ2 - fCenterZ));
+				GLfloat fDistance = std::sqrtf((fX2 - fCenterX) * (fX2 - fCenterX) + (fZ2 - fCenterZ) * (fZ2 - fCenterZ));
 
 				if (fDistance < fBrushSize)
 				{
 					/* Find distance from center of brush */
-					fYTop = GetHeightMapValueGlobal(fXTop, fZTop);
-					fYBottom = GetHeightMapValueGlobal(fXBottom, fZBottom);
-					fYLeft = GetHeightMapValueGlobal(fXLeft, fZLeft);
-					fYRight = GetHeightMapValueGlobal(fXRight, fZRight);
+					fYTop = GetHeightMapValueGlobalNew(fXTop, fZTop);
+					fYBottom = GetHeightMapValueGlobalNew(fXBottom, fZBottom);
+					fYLeft = GetHeightMapValueGlobalNew(fXLeft, fZLeft);
+					fYRight = GetHeightMapValueGlobalNew(fXRight, fZRight);
 
-					fHeight = GetHeightMapValue(fX2, fZ2);
+					GLfloat fHeight = GetHeightMapValue(fX2, fZ2);
 
-					fDelta = ((fYTop + fYBottom + fYLeft + fYRight) / 4.0f - fHeight) * static_cast<GLfloat>(iBrushStrength) / 250.0f;
+					GLfloat fDelta = ((fYTop + fYBottom + fYLeft + fYRight) / 4.0f - fHeight) * static_cast<GLfloat>(iBrushStrength / m_pOwnerTerrainMap->GetBrushMaxStrength());
 					fHeight += fDelta;
 
 					fHeight = std::clamp(fHeight, 0.0f, 100000.0f);
 
-					PutTerrainHeightMap(fX2, fZ2, fHeight, false);
+					PutTerrainHeightMap(fX2, fZ2, fHeight, true);
 				}
 			}
 		}
 	}
+
+	CalculateTerrainPatches();
 }
 
 void CTerrain::PutTerrainHeightMap(GLfloat fX, GLfloat fZ, GLfloat fValue, bool bRecursive)
 {
-	GLint iX = static_cast<GLint>(fX);
-	GLint iZ = static_cast<GLint>(fZ);
-
 	// Set height
-	GLint iPos = (iZ + 1) * HEIGHTMAP_RAW_XSIZE + (iX + 1);
-	if (iPos >= 0 && iPos < HEIGHTMAP_RAW_ZSIZE * HEIGHTMAP_RAW_XSIZE)
-		m_fHeightMap[iPos] = fValue;
+	GLint iX = static_cast<GLint>(std::floor(fX));
+	GLint iZ = static_cast<GLint>(std::floor(fZ));
+
+	if (iX < 0 || iX >= HEIGHTMAP_RAW_XSIZE || iZ < 0 || iZ >= HEIGHTMAP_RAW_ZSIZE)
+		return;
+
+	// No +1 here
+	GLint iPos = (iZ) * HEIGHTMAP_RAW_XSIZE + (iX);
+	m_fHeightMap[iPos] = fValue;
 
 	// Mark affected patch as needing update
 	GLint patchX = MyMath::imax(iX, 0) / PATCH_XSIZE;
@@ -1470,7 +2833,6 @@ void CTerrain::PutTerrainHeightMap(GLfloat fX, GLfloat fZ, GLfloat fValue, bool 
 		}
 	}
 }
-
 
 // Terrain Pool
 CDynamicPool<CTerrain> CTerrain::ms_TerrainPool;

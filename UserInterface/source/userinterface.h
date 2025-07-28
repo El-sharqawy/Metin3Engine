@@ -15,8 +15,6 @@ public:
 	CUserInterface(CWindow* pWindow);
 	~CUserInterface();
 
-	void SetupTextureSet();
-
 	void Destroy();
 
 	virtual void Render();
@@ -25,9 +23,9 @@ public:
 	void RenderMapsUI();
 	void RenderCreateNewMapPopUP(bool& showPopup, CTerrainManager* pTerrainManager);
 	void RenderLoadMapPopUP(bool& showPopup, CTerrainManager* pTerrainManager);
-	void RenderSaveMapPopUP(bool& showPopup, CTerrainManager* pTerrainManager);
 
 	void RenderTerrainUI();
+	void RenderSkyBoxUI();
 
 #if defined(ENABLE_DISCORD_RPC)
 	void Discord_Start();
@@ -47,8 +45,6 @@ private:
 	bool m_bInitialized = false;
 
 	GLint m_iSelectedBtnIdx;
-
-	std::vector<const char*> m_vTextureNames;
 
 public:
 	bool ToggleButton(const char* label, bool* p_state, const ImVec2& size = ImVec2(0, 0),

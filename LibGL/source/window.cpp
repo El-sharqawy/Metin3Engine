@@ -6,9 +6,11 @@
 
 #include "screen.h"
 
-#include "../../LibTerrain/source/TerrainPatch.h"
 #include "../../LibTerrain/source/TerrainMap.h"
 #include "../../LibTerrain/source/TerrainManager.h"
+#include "../../LibGame/source/SkyBox.h"
+#include "../../LibTerrain/source/TerrainAreaData.h"
+#include "../../LibGame/source/Mesh.h"
 
 static CWindow* appWnd = nullptr;
 GLuint CWindow::m_uiRandSeed = 0;
@@ -45,6 +47,8 @@ CWindow::CWindow()
 #else
 	m_uiRandSeed = getpid();
 #endif
+	m_pSkyBox = nullptr;
+	m_pScreenSpaceShader = nullptr;
 }
 
 CWindow::CWindow(const std::string& stTitle, const GLuint& width, const GLuint& height, const bool& bIsFullScreen)
@@ -65,6 +69,9 @@ CWindow::CWindow(const std::string& stTitle, const GLuint& width, const GLuint& 
 	appWnd = this;
 
 	m_pCamera = CCameraManager::Instance().GetCurrentCamera();
+
+	m_pSkyBox = nullptr;
+	m_pScreenSpaceShader = nullptr;
 
 	InitializeWindow(stTitle, width, height, bIsFullScreen);
 }
@@ -138,15 +145,19 @@ bool CWindow::InitializeWindow(const std::string& stTitle, const GLuint& width, 
 		glfwSetInputMode(m_pWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 	}
 
-	m_pScreen = new CScreen;
-
 	m_pTerrainManager = new CTerrainManager;
 	m_pTerrainManager->Create();
 	m_pTerrainManager->LoadMap("metin3_map_4v4");
 
+	m_pScreen = new CScreen;
 	m_pScreen->SetTerrainManager(m_pTerrainManager);
 
-	CTerrainVAO::Initialize();
+	m_pSkyBox = new CSkyBox(this);
+
+	m_pScreenSpaceShader = new CScreenSpaceShader("shaders/post_processing.frag");
+
+	m_pFrameBufObj = new CFrameBuffer();
+	m_pFrameBufObj->Init(GetWidth(), GetHeight());
 
 	SetWindowIcon("resources/icon/terrain.png");
 	return (true);
@@ -323,62 +334,6 @@ void CWindow::keys_callback(GLFWwindow* window, int key, int scancode, int actio
 			glfwSetWindowShouldClose(window, true);
 			break;
 
-		case GLFW_KEY_0:
-			appWnd->GetTerrainManager()->SetEditing(false);
-			appWnd->GetTerrainManager()->SetEditingHeight(false);
-			appWnd->GetTerrainManager()->SetBrushType(BRUSH_TYPE_NONE);
-			break;
-
-		case GLFW_KEY_1:
-			appWnd->GetTerrainManager()->SetEditing(true);
-			appWnd->GetTerrainManager()->SetEditingHeight(true);
-			appWnd->GetTerrainManager()->SetBrushType(BRUSH_TYPE_UP);
-			break;
-
-		case GLFW_KEY_2:
-			appWnd->GetTerrainManager()->SetEditing(true);
-			appWnd->GetTerrainManager()->SetEditingHeight(true);
-			appWnd->GetTerrainManager()->SetBrushType(BRUSH_TYPE_DOWN);
-			break;
-
-		case GLFW_KEY_3:
-			appWnd->GetTerrainManager()->SetEditing(true);
-			appWnd->GetTerrainManager()->SetEditingHeight(true);
-			appWnd->GetTerrainManager()->SetBrushType(BRUSH_TYPE_FLATTEN);
-			break;
-
-		case GLFW_KEY_4:
-			appWnd->GetTerrainManager()->SetEditing(true);
-			appWnd->GetTerrainManager()->SetEditingHeight(true);
-			appWnd->GetTerrainManager()->SetBrushType(BRUSH_TYPE_NOISE);
-			break;
-
-		case GLFW_KEY_5:
-			appWnd->GetTerrainManager()->SetEditing(true);
-			appWnd->GetTerrainManager()->SetEditingHeight(true);
-			appWnd->GetTerrainManager()->SetBrushType(BRUSH_TYPE_SMOOTH);
-			break;
-
-		case GLFW_KEY_KP_ADD:
-			appWnd->GetTerrainManager()->SetBrushSize(appWnd->GetTerrainManager()->GetBrushSize() + 1);
-			break;
-
-		case GLFW_KEY_Q:
-			sys_log("***This Is Break Line***");
-			break;
-
-		case GLFW_KEY_MINUS:
-			appWnd->GetTerrainManager()->SetBrushSize(appWnd->GetTerrainManager()->GetBrushSize() - 1);
-			break;
-
-		case GLFW_KEY_F1:
-			appWnd->GetTerrainManager()->SetBrushStrength(appWnd->GetTerrainManager()->GetBrushStrength() + 1);
-			break;
-
-		case GLFW_KEY_F2:
-			appWnd->GetTerrainManager()->SetBrushStrength(appWnd->GetTerrainManager()->GetBrushStrength() - 1);
-			break;
-
 		case GLFW_KEY_X:
 			appWnd->GetCamera()->SetLock(!appWnd->GetCamera()->IsLocked());
 			break;
@@ -390,6 +345,10 @@ void CWindow::keys_callback(GLFWwindow* window, int key, int scancode, int actio
 
 		case GLFW_KEY_LEFT_SHIFT:
 			appWnd->GetCamera()->SetSprinting();
+			break;
+
+		case GLFW_KEY_F1:
+			appWnd->GetCamera()->InvertCameraPitch();
 			break;
 
 		case GLFW_KEY_F5:
@@ -438,17 +397,18 @@ void CWindow::ResizeWindow(GLuint iWidth, GLuint iHeight)
 
 	if (GetFrameBuffer())
 		GetFrameBuffer()->BindForWriting();
+
 	glViewport(0, 0, iWidth, iHeight);
+
 	if (GetFrameBuffer())
 		GetFrameBuffer()->UnBindWriting();
 }
 
 void CWindow::Destroy()
 {
-	CTerrainVAO::Destroy();
-
 	safe_delete(m_pScreen);
 	safe_delete(m_pTerrainManager);
+	safe_delete(m_pSkyBox);
 
 	glfwDestroyWindow(m_pWindow);
 	glfwTerminate();
@@ -515,9 +475,13 @@ CFrameBuffer* CWindow::GetFrameBuffer()
 
 void CWindow::Update(GLfloat fDeltaTime)
 {
+	m_pFrameBufObj->BindForWriting();
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	//glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-	glClearBufferfv(GL_COLOR, 0, SVector3Df(0.1f, 0.1f, 0.1f));
+
+	SVector3Df v3FogColor = GetSkyBox()->GetFogColor();
+	GLfloat clearColor[4] = { v3FogColor.x, v3FogColor.y, v3FogColor.z, 1.0f };
+	glClearBufferfv(GL_COLOR, 0, clearColor);
 
 	// Render
 	CCameraManager::Instance().GetCurrentCamera()->OnRender();
@@ -529,15 +493,44 @@ void CWindow::Update(GLfloat fDeltaTime)
 
 	m_pScreen->SetCursorPosition((GLint)mouseX, (GLint)mouseY, winW, winH);
 	m_pTerrainManager->UpdateEditingPoint(&m_pScreen->GetIntersectionPoint());
-	m_pScreen->Update();
+
+	m_pSkyBox->Update();
 
 	ProcessInput(fDeltaTime);
+
+	if (appWnd->m_bIsWireFrame)
+	{
+		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	}
+	else
+	{
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	}
+
 
 	if (m_pTerrainManager->IsMapReady())
 	{
 	//	m_pTerrainManager->Update();
-		m_pTerrainManager->GetMapRef().Render();
+		m_pSkyBox->Render();
+
+		m_pScreen->Update();
+
+		m_pTerrainManager->GetMapRef().Render(fDeltaTime);
 	}
+	m_pFrameBufObj->UnBindWriting();
+
+	//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_CULL_FACE); // Ensure culling doesn’t interfere
+	glDisable(GL_BLEND); // Disable blending to avoid transparency issues
+
+	CShader* pScreenShader = m_pScreenSpaceShader->GetShaderPtr();
+	pScreenShader->Use();
+	pScreenShader->setVec2("resolution", GetWidth(), GetHeight());
+	pScreenShader->setSampler2D("screenTexture", m_pFrameBufObj->GetTextureID(), 0);
+	pScreenShader->setSampler2D("depthTex", m_pFrameBufObj->GetDepthTextureID(), 1);
+	m_pScreenSpaceShader->Render();
 }
 
 CTerrainManager* CWindow::GetTerrainManager()

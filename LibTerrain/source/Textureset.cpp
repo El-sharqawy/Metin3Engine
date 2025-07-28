@@ -107,6 +107,7 @@ bool CTerrainTextureset::Save(const std::string& stFileName)
 		json textureEntry{};
 		textureEntry["texture_id"] = i;
 		textureEntry["textures"] = m_vTextures[i].ToJson();
+		//textureEntry["textures"] = { "filename", m_vTextures[i].m_stFileName };
 		jsonTexture["texture_set"].push_back(textureEntry);
 	}
 
@@ -179,13 +180,6 @@ bool CTerrainTextureset::Load(const std::string& stFileName)
 
 			texture.m_stFileName = data["filename"].get<std::string>();
 			texture.m_uiTextureID = texture_id;
-			texture.m_fUScale = data["u_scale"].get<GLfloat>();
-			texture.m_fVScale = data["v_scale"].get<GLfloat>();
-			texture.m_fUOffset = data["u_offset"].get<GLfloat>();
-			texture.m_fVOffset = data["v_offset"].get<GLfloat>();
-			texture.m_bIsSplat = data["is_splat"].get<bool>();
-			texture.m_uiHeightMin = data["begin"].get<GLuint>();
-			texture.m_uiHeightMax = data["end"].get<GLuint>();
 
 			SetTexture(i + 1, texture);
 		}
@@ -228,15 +222,6 @@ void CTerrainTextureset::Reload()
 		tex.m_pTexture->MakeResident();
 
 		tex.m_uiTextureID = tex.m_pTexture->GetTextureID();
-
-		// Recompute the transformation matrix
-		CMatrix4Df matScale{};
-		matScale.InitScaleTransform(m_fTerrainTexCoordBase * tex.m_fUScale, 1.0f, m_fTerrainTexCoordBase * tex.m_fVScale);
-
-		CMatrix4Df matTranslate{};
-		matTranslate.InitTranslationTransform(tex.m_fUOffset, 0.0f, tex.m_fVOffset);
-
-		tex.m_matTransform = matTranslate * matScale;
 	}
 }
 
@@ -252,13 +237,6 @@ bool CTerrainTextureset::SetTexture(size_t iIndex, const TTerrainTexture& Textur
 
 	tex.m_stFileName = Texture.m_stFileName;
 	tex.m_uiTextureID = Texture.m_uiTextureID;
-	tex.m_fUScale = Texture.m_fUScale;
-	tex.m_fVScale = Texture.m_fVScale;
-	tex.m_fUOffset = Texture.m_fUOffset;
-	tex.m_fVOffset = Texture.m_fVOffset;
-	tex.m_bIsSplat = Texture.m_bIsSplat;
-	tex.m_uiHeightMin = Texture.m_uiHeightMin;
-	tex.m_uiHeightMax = Texture.m_uiHeightMax;
 
 	// Create and load the new texture
 	tex.m_pTexture = new CTexture(tex.m_stFileName, GL_TEXTURE_2D);
@@ -273,28 +251,11 @@ bool CTerrainTextureset::SetTexture(size_t iIndex, const TTerrainTexture& Textur
 
 	tex.m_uiTextureID = tex.m_pTexture->GetTextureID();
 
-	// Calculate transformation matrix
-	CMatrix4Df matScale{};
-	matScale.InitScaleTransform(m_fTerrainTexCoordBase * tex.m_fUScale, 1.0f, m_fTerrainTexCoordBase * tex.m_fVScale);
-
-	CMatrix4Df matTranslate{};
-	matTranslate.InitTranslationTransform(tex.m_fUOffset, 0.0f, tex.m_fVOffset);
-
-	tex.m_matTransform = matTranslate * matScale;
-
 	sys_log("CTerrainTextureSet::SetTexture: Added Texture: %s", tex.m_stFileName.c_str());
 	return (true);
 }
 
-bool CTerrainTextureset::SetTexture(size_t iIndex,
-	const std::string& stFileName,
-	GLfloat fUScale,
-	GLfloat fVScale,
-	GLfloat fUOffset,
-	GLfloat fVOffset,
-	bool bIsSplat,
-	GLuint uiHeightMin,
-	GLuint uiHeightMax)
+bool CTerrainTextureset::SetTexture(size_t iIndex, const std::string& stFileName)
 {
 	if (iIndex >= m_vTextures.size())
 	{
@@ -306,13 +267,6 @@ bool CTerrainTextureset::SetTexture(size_t iIndex,
 
 	tex.m_stFileName = stFileName;
 	tex.m_uiTextureID = 0;
-	tex.m_fUScale = fUScale;
-	tex.m_fVScale = fVScale;
-	tex.m_fUOffset = fUOffset;
-	tex.m_fVOffset = fVOffset;
-	tex.m_bIsSplat = bIsSplat;
-	tex.m_uiHeightMin = uiHeightMin;
-	tex.m_uiHeightMax = uiHeightMax;
 
 	// Create and load the new texture
 	tex.m_pTexture = new CTexture(tex.m_stFileName, GL_TEXTURE_2D);
@@ -324,17 +278,7 @@ bool CTerrainTextureset::SetTexture(size_t iIndex,
 	}
 
 	tex.m_pTexture->MakeResident();
-
 	tex.m_uiTextureID = tex.m_pTexture->GetTextureID();
-
-	// Calculate transformation matrix
-	CMatrix4Df matScale{};
-	matScale.InitScaleTransform(m_fTerrainTexCoordBase * tex.m_fUScale, 1.0f, m_fTerrainTexCoordBase * tex.m_fVScale);
-
-	CMatrix4Df matTranslate{};
-	matTranslate.InitTranslationTransform(tex.m_fUOffset, 0.0f, tex.m_fVOffset);
-
-	tex.m_matTransform = matTranslate * matScale;
 
 	return (true);
 }
@@ -371,14 +315,7 @@ bool CTerrainTextureset::AddTexture(const TTerrainTexture& Texture)
 	return SetTexture(m_vTextures.size() - 1, Texture);
 }
 
-bool CTerrainTextureset::AddTexture(const std::string& stFileName,
-	GLfloat fUScale,
-	GLfloat fVScale,
-	GLfloat fUOffset,
-	GLfloat fVOffset,
-	bool bIsSplat,
-	GLuint uiHeightMin,
-	GLuint uiHeightMax)
+bool CTerrainTextureset::AddTexture(const std::string& stFileName)
 {
 	if (GetTexturesCount() >= 256)
 	{
@@ -405,7 +342,7 @@ bool CTerrainTextureset::AddTexture(const std::string& stFileName,
 	m_vTextures.emplace_back();
 
 	// Set the texture at the new index
-	return (SetTexture(m_vTextures.size() - 1, stFileName, fUScale, fVScale, fUOffset, fVOffset, bIsSplat, uiHeightMin, uiHeightMax));
+	return (SetTexture(m_vTextures.size() - 1, stFileName));
 }
 
 bool CTerrainTextureset::IsValidImage(const std::string& filePath)

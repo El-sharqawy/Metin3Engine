@@ -3,7 +3,7 @@
 #include <glad/glad.h>
 #include <memory>
 #include "singleton.h"
-#include "shader.h"
+#include "Shader.h"
 #include "../../LibMath/source/ray.h"
 
 class CTerrainManager;
@@ -29,6 +29,8 @@ public:
 	void RenderBox3d(float sx, float sy, float sz, float ex, float ey, float ez);
 	void RenderSquare3d(float sx, float sy, float sz, float ex, float ey, float ez);
 
+	void RenderPieceLine(GLfloat fxStart, GLfloat fzStart, GLfloat fxEnd, GLfloat fzEnd, GLint iStep = 128);
+
 	void Init();
 
 	const SVector4Df& GetDiffuseColor();
@@ -48,10 +50,14 @@ public:
 	void RenderTerrainEditingArea();
 
 	void RenderTerrainCursorCircle(GLfloat fx, GLfloat fy, GLfloat fz, GLfloat fRadius, GLint iStep = 128);
+	void RenderTerrainCursorSquare(GLfloat fxStart, GLfloat fzStart, GLfloat fxEnd, GLfloat fzEnd, GLint iStep = 128);
+
+	void RenderWaterEditingArea();
 
 	void SetTerrainManager(CTerrainManager* pTerrainManager);
 
 	static SVector3Df& GetIntersectionPoint();
+	static SVector3Df& GetEditingCenterPoint();
 
 	static CRay& GetCRay()
 	{
@@ -73,7 +79,7 @@ private:
 	static GLuint m_iIdxBuf; // Index Buffer
 	static GLint m_iVertexCapacity;
 
-	static std::unique_ptr<CShader> m_pLineShader;
+	CShader *m_pLineShader;
 	static GLboolean m_bIsInitialized;
 	static SVector4Df m_v4DiffColor;
 
@@ -90,4 +96,5 @@ protected:
 	static SVector3Df ms_v3PickRayOrigin;
 	static SVector3Df ms_v3PickRayDir;
 	static SVector3Df ms_v3IntersectionPoint;
+	static SVector3Df ms_v3EditingCenterPoint;
 };

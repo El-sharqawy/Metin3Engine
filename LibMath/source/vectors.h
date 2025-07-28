@@ -1315,6 +1315,24 @@ struct SVector3Df
 	 */
 	operator const float* () const;
 
+	float& operator[](size_t index) {
+		switch (index) {
+		case 0: return x;
+		case 1: return y;
+		case 2: return z;
+		default: throw std::out_of_range("Invalid index");
+		}
+	}
+
+	const float& operator[](size_t index) const {
+		switch (index) {
+		case 0: return x;
+		case 1: return y;
+		case 2: return z;
+		default: throw std::out_of_range("Invalid index");
+		}
+	}
+
 	/**
 	 * Prints the x, y, and z components of the SVector3Df object to the console.
 	 *
@@ -1587,6 +1605,16 @@ struct SVector4Df
 	SVector4Df(const float _x, const float _y, const float _z, const float _w);
 
 	/**
+	 * SVector4Df constructor that initializes each component with a separate value.
+	 *
+	 * @param _x The value for the x component.
+	 * @param _y The value for the y component.
+	 * @param _z The value for the z component.
+	 * @param _w The value for the w component. (scalar)
+	 */
+	SVector4Df(const int32_t _x, const int32_t _y, const int32_t _z, const int32_t _w);
+
+	/**
 	 * SVector4Df constructor that initializes from a std::array, with optional safety checks.
 	 *
 	 * If `bSafety` is true, the constructor uses `arr.at(i)` for bounds checking.
@@ -1647,6 +1675,8 @@ struct SVector4Df
 
 	SVector4Df& operator/=(float scalar)
 	{
+		assert(scalar != 0);
+
 		x /= scalar;
 		y /= scalar;
 		z /= scalar;
@@ -1690,7 +1720,6 @@ struct SVector4Df
 		}
 	}
 
-
 	/**
 	 * Provides a const pointer to the underlying float array.
 	 *
@@ -1729,7 +1758,6 @@ struct SVector4Df
 	 * @return The dot product of the two vectors.
 	 */
 	float dot(const SVector4Df& vec) const;
-
 
 	/**
 	 * Returns a pointer to the underlying float array.
@@ -1847,3 +1875,513 @@ SVector4Df operator*(const SVector4Df& vec1, const SVector4Df& vec2);
  * @throws std::domain_error If any component of the divisor is zero.
  */
 SVector4Df operator/(const SVector4Df& vec1, const SVector4Df& vec2);
+
+/**
+ * SVector4Di: A 4D integer vector struct.
+ *
+ * This struct represents a 4D vector with integer components. It provides
+ * basic vector operations such as addition, subtraction, scalar multiplication,
+ * dot product, length calculation, and normalization.
+ *
+ * Key features:
+ * - Efficient integer-based operations
+ * - Accurate length and normalization calculations
+ * - Support for dot product
+ * - Conversion to and from GLM vectors for interoperability
+ * - Clear and concise implementation adhering to Betty coding standards
+ */
+struct SVector4Di
+{
+	union {
+		int32_t x;
+		int32_t r;
+	};
+
+	union {
+		int32_t y;
+		int32_t g;
+	};
+
+	union {
+		int32_t z;
+		int32_t b;
+	};
+
+	union {
+		int32_t w;
+		int32_t a;
+	};
+
+	/**
+	 * Default constructor, initializes all components to zero.
+	 */
+	SVector4Di() = default;
+
+	/**
+	 * SVector4Di constructor that initializes all components to a single value.
+	 *
+	 * @param fVal The value to initialize all components to.
+	 */
+	SVector4Di(const float fVal);
+
+	/**
+	 * SVector4Di constructor that initializes all components to a single value.
+	 *
+	 * @param iVal The value to initialize all components to.
+	 */
+	SVector4Di(const int32_t iVal);
+
+	/**
+	 * SVector4Di constructor that initializes each component with a separate value.
+	 *
+	 * @param _x The value for the x component.
+	 * @param _y The value for the y component.
+	 * @param _z The value for the z component.
+	 * @param _w The value for the w component. (scalar)
+	 */
+	SVector4Di(const float _x, const float _y, const float _z, const float _w);
+
+	/**
+	 * SVector4Di constructor that initializes each component with a separate value.
+	 *
+	 * @param _x The value for the x component.
+	 * @param _y The value for the y component.
+	 * @param _z The value for the z component.
+	 * @param _w The value for the w component. (scalar)
+	 */
+	SVector4Di(const int32_t _x, const int32_t _y, const int32_t _z, const int32_t _w);
+
+	/**
+	 * SVector4Di constructor that initializes from a std::array, with optional safety checks.
+	 *
+	 * If `bSafety` is true, the constructor uses `arr.at(i)` for bounds checking.
+	 * Otherwise, it assumes valid indexing and uses `arr[i]`.
+	 *
+	 * @param arr The std::array to copy from.
+	 * @param bSafety Flag to enable bounds checking.
+	 */
+	SVector4Di(const std::array<float, 4>& arr, bool bSafety = false);
+
+	/**
+	 * SVector4Di constructor that initializes from a std::array, with optional safety checks.
+	 *
+	 * If `bSafety` is true, the constructor uses `arr.at(i)` for bounds checking.
+	 * Otherwise, it assumes valid indexing and uses `arr[i]`.
+	 *
+	 * @param arr The std::array to copy from.
+	 * @param bSafety Flag to enable bounds checking.
+	 */
+	SVector4Di(const std::array<int32_t, 4>& arr, bool bSafety = false);
+
+	/**
+	 * SVector4Di constructor that initializes from a raw float pointer.
+	 *
+	 * If the pointer is null, all components are set to zero.
+	 *
+	 * @param pVec The pointer to a float array (length 4).
+	 */
+	SVector4Di(const float* pVec);
+
+	/**
+	 * SVector4Di constructor that initializes from a raw integer pointer.
+	 *
+	 * If the pointer is null, all components are set to zero.
+	 *
+	 * @param pVec The pointer to a integer array (length 4).
+	 */
+	SVector4Di(const int32_t* pVec);
+
+	/**
+	 * SVector4Di constructor that initializes from an SVector2Df and two additional values.
+	 *
+	 * @param vec The SVector2Df object to copy from.
+	 * @param _z The value for the z component.
+	 * @param _w The value for the w component.
+	 */
+	SVector4Di(const SVector2Df& vec, const float _z, const float _w);
+
+	/**
+	 * SVector4Di constructor that initializes from an SVector2Di and two additional values.
+	 *
+	 * @param vec The SVector2Di object to copy from.
+	 * @param _z The value for the z component.
+	 * @param _w The value for the w component.
+	 */
+	SVector4Di(const SVector2Di& vec, const int32_t _z, const int32_t _w);
+
+	/**
+	 * SVector4Di constructor that initializes from an SVector3Df and one additional value.
+	 *
+	 * @param vec The SVector3Df object to copy from.
+	 * @param _w The value for the w component.
+	 */
+	SVector4Di(const SVector3Df& vec, const float _w);
+
+	/**
+	 * SVector4Di constructor that initializes from an SVector3Di and one additional value.
+	 *
+	 * @param vec The SVector3Di object to copy from.
+	 * @param _w The value for the w component.
+	 */
+	SVector4Di(const SVector3Di& vec, const int32_t _w);
+
+	/**
+	 * SVector4Di constructor that initializes from a glm::vec3 and a scalar value.
+	 *
+	 * @param vec The glm::vec3 object to copy from.
+	 * @param _w The value for the w component.
+	 */
+	SVector4Di(const glm::vec3& vec, const float _w);
+
+	/**
+	 * SVector4Di constructor that initializes from a glm::ivec3 and a scalar value.
+	 *
+	 * @param vec The glm::ivec3 object to copy from.
+	 * @param _w The value for the w component.
+	 */
+	SVector4Di(const glm::ivec3& vec, const int32_t _w);
+
+	/**
+	 * SVector4Di copy constructor.
+	 *
+	 * @param vec The SVector4Df object to copy.
+	 */
+	SVector4Di(const SVector4Df& vec);
+
+	/**
+	 * SVector4Di copy constructor.
+	 *
+	 * @param vec The SVector4Di object to copy.
+	 */
+	SVector4Di(const SVector4Di& vec);
+
+	/**
+	 * SVector4Di constructor that initializes from a glm::vec4 object.
+	 *
+	 * @param vec The glm::vec4 object to copy from.
+	 */
+	SVector4Di(const glm::vec4& vec);
+
+	/**
+	 * SVector4Di constructor that initializes from a glm::ivec4 object.
+	 *
+	 * @param vec The glm::ivec4 object to copy from.
+	 */
+	SVector4Di(const glm::ivec4& vec);
+
+	/**
+	 * Divides all components of this SVector4Di object by a scalar value, modifying it in-place.
+	 *
+	 * @param iVal The scalar value to divide by.
+	 * @return A reference to this modified SVector2Di object.
+	 * @throws std::domain_error If the divisor is zero.
+	 */
+	SVector4Di& operator/=(float scalar)
+	{
+		assert(scalar != 0);
+
+		x /= static_cast<int32_t>(scalar);
+		y /= static_cast<int32_t>(scalar);
+		z /= static_cast<int32_t>(scalar);
+		w /= static_cast<int32_t>(scalar);
+		return *this;
+	}
+
+	/**
+	 * Compares SVector4Di with SVector4Df objects for equality.
+	 *
+	 * @param vec The SVector4Df object to compare to.
+	 * @return true if the two objects are equal, false otherwise.
+	 */
+	bool operator == (const SVector4Df& vec);
+
+	/**
+	 * Compares two SVector4Di objects for equality.
+	 *
+	 * @param vec The SVector4Di object to compare to.
+	 * @return true if the two objects are equal, false otherwise.
+	 */
+	bool operator == (const SVector4Di& vec);
+
+	/**
+	 * Compares SVector4Di with SVector4Df objects for inequality.
+	 *
+	 * @param vec The SVector4Df object to compare to.
+	 * @return true if the two objects are not equal, false otherwise.
+	 */
+	bool operator != (const SVector4Df& vec);
+
+	/**
+	 * Compares two SVector4Di objects for inequality.
+	 *
+	 * @param vec The SVector4Di object to compare to.
+	 * @return true if the two objects are not equal, false otherwise.
+	 */
+	bool operator != (const SVector4Di& vec);
+
+	int32_t& operator[](size_t index)
+	{
+		switch (index)
+		{
+		case 0: return x;
+		case 1: return y;
+		case 2: return z;
+		case 3: return w;
+		default: throw std::out_of_range("Invalid index");
+		}
+	}
+
+	const int32_t& operator[](size_t index) const
+	{
+		switch (index)
+		{
+		case 0: return x;
+		case 1: return y;
+		case 2: return z;
+		case 3: return w;
+		default: throw std::out_of_range("Invalid index");
+		}
+	}
+
+	/**
+	 * Provides a const pointer to the underlying integer array.
+	 *
+	 * This allows direct access to the x, y, z, and w components as a integer array.
+	 *
+	 * @return A const pointer to the integer array.
+	 */
+	operator const int32_t* () const;
+
+	/**
+	 * Prints the x, y, z, and w components of the SVector4Di object to the console.
+	 *
+	 * @param bEndl If true, a newline character is printed after the values.
+	 */
+	void print(bool bEndl = true) const;
+
+	/**
+	 * Calculates the length (magnitude) of the SVector4Di object.
+	 *
+	 * @return The length of the vector.
+	 */
+	float length() const;
+
+	/**
+	 * Normalizes the SVector4Di object, making its length 1.
+	 *
+	 * @return A reference to this modified SVector4Di object.
+	 * @throws std::domain_error If the vector is zero.
+	 */
+	SVector4Di& normalize();
+
+	/**
+	 * Calculates the dot product of two SVector4Df objects.
+	 *
+	 * @param vec The SVector4Df object to calculate the dot product with.
+	 * @return The dot product of the two vectors.
+	 */
+	int32_t dot(const SVector4Df& vec) const;
+
+	/**
+	 * Calculates the dot product of two SVector4Di objects.
+	 *
+	 * @param vec The SVector4Di object to calculate the dot product with.
+	 * @return The dot product of the two vectors.
+	 */
+	int32_t dot(const SVector4Di& vec) const;
+
+	/**
+	 * Returns a pointer to the underlying integer array.
+	 *
+	 * This allows direct access to the x, y, z, and w components as a integer array.
+	 *
+	 * @return A pointer to the integer array.
+	 */
+	int32_t* data();
+
+	/**
+	 * Checks if all components of the SVector4Di object are zero.
+	 *
+	 * @return true if all components are zero, false otherwise.
+	 */
+	bool IsZero() const;
+
+	/**
+	 * Sets all components of the SVector4Di object to the specified value.
+	 *
+	 * @param fVal The value to set all components to.
+	 */
+	void SetAll(const float fVal);
+
+	/**
+	 * Sets all components of the SVector4Di object to the specified value.
+	 *
+	 * @param fVal The value to set all components to.
+	 */
+	void SetAll(const int32_t iVal);
+
+	/**
+	 * Sets all components of the SVector4Di object to zero.
+	 */
+	void SetToZero();
+
+	/**
+	 * Converts the SVector4Di object to a glm::ivec4 object.
+	 *
+	 * @return The equivalent glm::ivec4 object.
+	 */
+	glm::ivec4 ToGLM() const;
+
+	/**
+	 * Converts the SVector4Di object to an SVector3Di object by discarding the w component.
+	 *
+	 * @return The equivalent SVector3Di object.
+	 */
+	SVector3Di To3D() const;
+};
+
+/**
+ * Adds a scalar value to all components of an SVector4Di object.
+ *
+ * @param vec The SVector4Di object to add to.
+ * @param fVal The scalar value to add.
+ * @return The resulting SVector4Di object.
+ */
+SVector4Di operator+(const SVector4Di& vec, float fVal);
+
+/**
+ * Adds a scalar value to all components of an SVector4Di object.
+ *
+ * @param vec The SVector4Di object to add to.
+ * @param iVal The scalar value to add.
+ * @return The resulting SVector4Di object.
+ */
+SVector4Di operator+(const SVector4Di& vec, int32_t iVal);
+
+/**
+ * Subtracts a scalar value from all components of an SVector4Di object.
+ *
+ * @param vec The SVector4Di object to subtract from.
+ * @param fVal The scalar value to subtract.
+ * @return The resulting SVector4Di object.
+ */
+SVector4Di operator-(const SVector4Di& vec, float fVal);
+
+/**
+ * Subtracts a scalar value from all components of an SVector4Di object.
+ *
+ * @param vec The SVector4Di object to subtract from.
+ * @param fVal The scalar value to subtract.
+ * @return The resulting SVector4Di object.
+ */
+SVector4Di operator-(const SVector4Di& vec, int32_t iVal);
+
+/**
+ * Multiplies all components of an SVector4Di object by a scalar value.
+ *
+ * @param vec The SVector4Di object to multiply.
+ * @param fVal The scalar value to multiply by.
+ * @return The resulting SVector4Di object.
+ */
+SVector4Di operator*(const SVector4Di& vec, float fVal);
+
+/**
+ * Multiplies all components of an SVector4Di object by a scalar value.
+ *
+ * @param vec The SVector4Di object to multiply.
+ * @param fVal The scalar value to multiply by.
+ * @return The resulting SVector4Di object.
+ */
+SVector4Di operator*(const SVector4Di& vec, int32_t iVal);
+
+/**
+ * Divides all components of an SVector4Di object by a scalar value.
+ *
+ * @param vec The SVector4Di object to divide.
+ * @param fVal The scalar value to divide by.
+ * @return The resulting SVector4Di object.
+ * @throws std::domain_error If the divisor is zero.
+ */
+SVector4Di operator/(const SVector4Di& vec, float fVal);
+
+/**
+ * Divides all components of an SVector4Di object by a scalar value.
+ *
+ * @param vec The SVector4Di object to divide.
+ * @param fVal The scalar value to divide by.
+ * @return The resulting SVector4Di object.
+ * @throws std::domain_error If the divisor is zero.
+ */
+SVector4Di operator/(const SVector4Di& vec, int32_t iVal);
+
+/**
+ * Adds two SVector4Di and SVector4Df objects component-wise.
+ *
+ * @param vec1 The first SVector4Di object.
+ * @param vec2 The second SVector4Df object.
+ * @return The resulting SVector4Di object.
+ */
+SVector4Di operator+(const SVector4Di& vec1, const SVector4Df& vec2);
+
+/**
+ * Adds two SVector4Di and SVector4Di objects component-wise.
+ *
+ * @param vec1 The first SVector4Di object.
+ * @param vec2 The second SVector4Di object.
+ * @return The resulting SVector4Di object.
+ */
+SVector4Di operator+(const SVector4Di& vec1, const SVector4Di& vec2);
+
+/**
+ * Subtracts one SVector4Di object from another SVector4Df component-wise.
+ *
+ * @param vec1 The first SVector4Di object.
+ * @param vec2 The second SVector4Df object to subtract.
+ * @return The resulting SVector4Di object.
+ */
+SVector4Di operator-(const SVector4Di& vec1, const SVector4Df& vec2);
+
+/**
+ * Subtracts one SVector4Di object from another SVector4Di component-wise.
+ *
+ * @param vec1 The first SVector4Di object.
+ * @param vec2 The second SVector4Di object to subtract.
+ * @return The resulting SVector4Di object.
+ */
+SVector4Di operator-(const SVector4Di& vec1, const SVector4Di& vec2);
+
+/**
+ * Multiplies two SVector4Di and SVector4Df objects component-wise.
+ *
+ * @param vec1 The first SVector4Di object.
+ * @param vec2 The second SVector4Df object to multiply.
+ * @return The resulting SVector4Di object.
+ */
+SVector4Di operator*(const SVector4Di& vec1, const SVector4Df& vec2);
+
+/**
+ * Multiplies two SVector4Di and SVector4Di objects component-wise.
+ *
+ * @param vec1 The first SVector4Di object.
+ * @param vec2 The second SVector4Di object to multiply.
+ * @return The resulting SVector4Di object.
+ */
+SVector4Di operator*(const SVector4Di& vec1, const SVector4Di& vec2);
+
+/**
+ * Divides one SVector4Di object by another SVector4Df component-wise.
+ *
+ * @param vec1 The first SVector4Di object.
+ * @param vec2 The second SVector4Df object to divide by.
+ * @return The resulting SVector4Di object.
+ */
+SVector4Di operator/(const SVector4Di& vec1, const SVector4Df& vec2);
+
+/**
+ * Divides one SVector4Di object by another SVector4Di component-wise.
+ *
+ * @param vec1 The first SVector4Di object.
+ * @param vec2 The second SVector4Di object to divide by.
+ * @return The resulting SVector4Di object.
+ */
+SVector4Di operator/(const SVector4Di& vec1, const SVector4Di& vec2);

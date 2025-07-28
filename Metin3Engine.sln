@@ -11,10 +11,13 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LibImageUI", "LibImageUI\Li
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UserInterface", "UserInterface\UserInterface.vcxproj", "{3F3D76A2-51A9-4B89-9A3B-9A4DB0E7E53A}"
 	ProjectSection(ProjectDependencies) = postProject
+		{96697466-FB22-4BC3-A07D-DDB7753FAA8B} = {96697466-FB22-4BC3-A07D-DDB7753FAA8B}
 		{CF91D6AB-D1A5-4639-BB1D-99ADF0999683} = {CF91D6AB-D1A5-4639-BB1D-99ADF0999683}
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LibTerrain", "LibTerrain\LibTerrain.vcxproj", "{CF91D6AB-D1A5-4639-BB1D-99ADF0999683}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LibGame", "LibGame\LibGame.vcxproj", "{96697466-FB22-4BC3-A07D-DDB7753FAA8B}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -64,6 +67,14 @@ Global
 		{CF91D6AB-D1A5-4639-BB1D-99ADF0999683}.Release|x64.Build.0 = Release|x64
 		{CF91D6AB-D1A5-4639-BB1D-99ADF0999683}.Release|x86.ActiveCfg = Release|Win32
 		{CF91D6AB-D1A5-4639-BB1D-99ADF0999683}.Release|x86.Build.0 = Release|Win32
+		{96697466-FB22-4BC3-A07D-DDB7753FAA8B}.Debug|x64.ActiveCfg = Debug|x64
+		{96697466-FB22-4BC3-A07D-DDB7753FAA8B}.Debug|x64.Build.0 = Debug|x64
+		{96697466-FB22-4BC3-A07D-DDB7753FAA8B}.Debug|x86.ActiveCfg = Debug|Win32
+		{96697466-FB22-4BC3-A07D-DDB7753FAA8B}.Debug|x86.Build.0 = Debug|Win32
+		{96697466-FB22-4BC3-A07D-DDB7753FAA8B}.Release|x64.ActiveCfg = Release|x64
+		{96697466-FB22-4BC3-A07D-DDB7753FAA8B}.Release|x64.Build.0 = Release|x64
+		{96697466-FB22-4BC3-A07D-DDB7753FAA8B}.Release|x86.ActiveCfg = Release|Win32
+		{96697466-FB22-4BC3-A07D-DDB7753FAA8B}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

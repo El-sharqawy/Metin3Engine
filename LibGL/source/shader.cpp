@@ -1,5 +1,6 @@
 #include "stdafx.h"
-#include "shader.h"
+#include "Shader.h"
+#include "../../LibGame/source/ResourcesManager.h"
 
 /**
  * Constructor with shader paths.
@@ -62,7 +63,7 @@ CShader* CShader::AttachShader(const CBaseShader& shader)
 	return this;
 }
 
-void CShader::LinkPrograms()
+bool CShader::LinkPrograms()
 {
 	glLinkProgram(GetID());
 
@@ -76,11 +77,89 @@ void CShader::LinkPrograms()
 			glDeleteShader(m_lShaders.back());
 			m_lShaders.pop_back();
 		}
+
+		return (true);
 	}
 	else
 	{
 		sys_err("CShader::LinkPrograms Error Linking Program %s", GetName().c_str());
+		return (false);
 	}
+
+	return (false);
+}
+
+bool CShader::LoadFromDefinition(const SShaderProgramDefinitions& def)
+{
+	// 1. Check Validation 
+	if (def.sVertexPath.empty() || def.sFragmentPath.empty())
+	{
+		sys_err("CShader::LoadFromDefinition: Shader '%s' is missing a required vertex or fragment stage.", def.sName.c_str());
+		return false;
+	}
+
+	// 2. Load and Compile Each Stage
+	// We use a vector of unique_ptrs to manage the lifetime of the compiled stages.
+	// This ensures they are automatically deleted when the function returns.
+	std::vector<std::unique_ptr<CBaseShader>> compiledStages;
+
+	// A helper lambda to reduce code duplication. It loads a stage if the path is not empty.
+	auto loadStage = [&](const std::string& path)
+	{
+		if (!path.empty())
+		{
+			// The CBaseShader constructor loads and compiles the file.
+			auto shader = std::make_unique<CBaseShader>(path);
+			// If compilation fails, the shader ID will be 0.
+			if (shader->GetShaderID() != 0)
+			{
+				compiledStages.push_back(std::move(shader));
+			}
+			else
+			{
+				// The CBaseShader constructor should have already logged an error.
+				// We push a nullptr to signify a failed compilation attempt.
+				compiledStages.push_back(nullptr);
+			}
+		}
+	};
+
+	loadStage(def.sVertexPath);
+	loadStage(def.sFragmentPath);
+	loadStage(def.sGeometryPath);
+	loadStage(def.sTessControlPath);
+	loadStage(def.sTessEvalPath);
+	
+	// 3. Attach Shaders to the Program
+	for (const auto& shader : compiledStages)
+	{
+		// Check if the unique_ptr is not null
+		if (shader)
+		{
+			// Attach the valid, compiled shader.
+			AttachShader(*shader); // Dereference the pointer to pass the CBaseShader object
+		}
+		else
+		{
+			// If we find a nullptr, it means a required stage failed to compile.
+			sys_err("CShader::LoadFromDefinition: Halting link for '%s' due to a shader compilation failure.", def.sName.c_str());
+			return (false);
+		}
+	}
+
+	// 4. --- Link and Check for Errors ---
+	if (!LinkPrograms())
+	{
+		sys_err("CShader::LoadFromDefinition: Failed to link shader program '%s'", def.sName.c_str());
+		return (false);
+	}
+
+	SetName(def.sName);
+
+	// The unique_ptrs in the 'compiledStages' vector will now go out of scope.
+	// Their destructors will be called automatically, which in turn calls glDeleteShader
+	// on each compiled stage, freeing the memory.
+	return true;
 }
 
 /**
@@ -94,6 +173,10 @@ void CShader::Use() const
 	if (IsLinked())
 	{
 		glUseProgram(GetID());
+	}
+	else
+	{
+		sys_err("Failed to Link Program");
 	}
 }
 
@@ -122,6 +205,11 @@ bool CShader::IsLinked() const
 std::string CShader::GetName() const
 {
 	return (m_stName);
+}
+
+void CShader::SetName(const std::string& stShaderProgramName)
+{
+	m_stName = stShaderProgramName;
 }
 
 /**
@@ -408,10 +496,7 @@ void CShader::setVec4(const std::string& name, const SVector4Df& vec4) const
 void CShader::setMat4(const std::string& name, const CMatrix4Df& matrix, bool bTranspose) const
 {
 	GLuint iMatrixLocation = glGetUniformLocation(GetID(), name.c_str());
-
-	glCheckError();
 	glUniformMatrix4fv(iMatrixLocation, 1, bTranspose, (const GLfloat*)matrix.mat4);
-
 }
 
 void CShader::setSampler2D(const std::string& name, GLuint iTextureID, GLint iTexValue) const
@@ -442,4 +527,27 @@ void CShader::setSampler3D(const std::string& name, GLuint iTexValue, GLint iTex
 		glBindTexture(GL_TEXTURE_3D, iTextureID);
 	}
 	setInt(name, iTexValue);
+}
+
+/**
+ * Sets an sampler2D Bindless texture uniform in the shader program.
+ *
+ * This function locates the uniform variable in the shader by its name
+ * and sets its value to the provided integer.
+ *
+ * @param name: The name of the uniform variable in the shader.
+ * @param value: The unsigned integer64 value of texture Handler.
+ *
+ */
+void CShader::setBindlessSampler2D(const std::string& name, GLuint64 value) const
+{
+	GLint iIntLoc = glGetUniformLocation(GetID(), name.c_str());
+
+	if (iIntLoc == -1)
+	{
+		sys_err("[Shader] Warning: Uniform '%s' not found or optimized out.", name.c_str());
+		return;
+	}
+
+	glUniformHandleui64ARB(iIntLoc, value);
 }

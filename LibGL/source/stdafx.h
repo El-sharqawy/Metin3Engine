@@ -22,13 +22,12 @@
 #include "../../LibMath/source/stdafx.h"
 
 #include "window.h"
-#include "shader.h"
+#include "Shader.h"
 #include "utils.h"
 
 #include "camera.h"
 #include "texture.h"
 #include "../../LibMath/source/grid.h"
-#include "mesh.h"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>

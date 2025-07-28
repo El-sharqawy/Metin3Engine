@@ -1,0 +1,12 @@
+{
+    "base_position": {
+        "x": 0,
+        "z": 0
+    },
+    "map_size": {
+        "x": 5,
+        "z": 5
+    },
+    "script_type": "TerrainMapSettings",
+    "textureset": "metin3_map_5v5\\textureset.json"
+}

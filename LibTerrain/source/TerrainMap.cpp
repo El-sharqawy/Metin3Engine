@@ -1,5 +1,6 @@
 #include "Stdafx.h"
 #include "TerrainMap.h"
+#include "TerrainAreaData.h"
 
 CTerrainMap::CTerrainMap()
 {
@@ -20,21 +21,27 @@ void CTerrainMap::Clear()
 void CTerrainMap::Initialize()
 {
 	m_pMapShader = nullptr;
+	m_pMapWaterShader = nullptr;
 
 	m_iTerrainCountX = m_iTerrainCountZ = 0;
 	m_iNumTerrains = 0;
+	m_iNumAreas = 0;
 
 	m_uiTerrainHandlesSSBO = 0;
 	m_sUploadedTextureCount = 0; // Track New Textures
 	m_sAllocatedSSBOSlots = 0; // Track New Textures
 	m_vTextureHandles.clear();
 
+	// Terrain Brushes Part
+	m_iBrushStrength = 1;
+	m_iBrushMaxStrength = 250;
+	m_iBrushSize = 1;
+	m_iBrushMaxSize = 250;
+
 }
 
 void CTerrainMap::Destroy()
 {
-	safe_delete(m_pMapShader);
-
 	// Bindless Textures Part
 	if (m_uiTerrainHandlesSSBO)
 	{
@@ -45,8 +52,18 @@ void CTerrainMap::Destroy()
 	m_sAllocatedSSBOSlots = 0; // Track New Textures
 	m_vTextureHandles.clear();
 
+	// Release Water Data
+	safe_delete(m_pWaterDudvTex);
+	safe_delete(m_pWaterNormalTex);
+	safe_delete(m_pReflectionFBO);
+	safe_delete(m_pRefractionFBO);
+
 	DestroyTerrains();
 	CTerrain::DestroySystem();
+	CTerrainAreaData::DestroySystem();
+
+	CTerrainVAO::Destroy();
+	CTerrainWaterVAO::Destroy();
 }
 
 bool CTerrainMap::UpdateMap(const SVector3Df& v3PlayerPos)
@@ -56,6 +73,7 @@ bool CTerrainMap::UpdateMap(const SVector3Df& v3PlayerPos)
 		for (GLushort iTerrainX = 0; iTerrainX < m_iTerrainCountX; iTerrainX++)
 		{
 			LoadTerrain(iTerrainX, iTerrainZ, m_iNumTerrains);
+			LoadArea(iTerrainX, iTerrainZ, m_iNumTerrains);
 			m_iNumTerrains++;
 		}
 	}
@@ -63,30 +81,26 @@ bool CTerrainMap::UpdateMap(const SVector3Df& v3PlayerPos)
 	return (true);
 }
 
-void CTerrainMap::Render()
+void CTerrainMap::Render(GLfloat fDeltaTime)
 {
-	m_pMapShader->Use();
-
-	auto pCam = CCameraManager::Instance().GetCurrentCamera();
-
-	m_pMapShader->setMat4("ViewProjectionMatrix", pCam->GetViewProjMatrix());
-
 	// Bind SSBO to index 0
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_uiTerrainHandlesSSBO);
-	glEnable(GL_BLEND);
-	glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO);
 
-	for (auto it : m_vLoadedTerrains)
+	for (const auto& it : m_vLoadedAreas)
 	{
 		if (it)
 		{
-			GLint iNumTerr = it->GetTerrainNumber();
-			m_pMapShader->setInt("iTerrainNum", iNumTerr);
-			it->Render();
+			it->RenderAreaObjects(fDeltaTime);
 		}
 	}
 
-	glDisable(GL_BLEND);
+	for (const auto& it : m_vLoadedTerrains)
+	{
+		if (it && it->IsReady())
+		{
+			it->Render();
+		}
+	}
 
 	// Unbind SSBO from index 0
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, 0); // Critical for safety
@@ -95,5 +109,8 @@ void CTerrainMap::Render()
 void CTerrainMap::DestroyTerrains()
 {
 	m_vLoadedTerrains.clear();
+	m_vLoadedAreas.clear();
+
 	CTerrain::ms_TerrainPool.FreeAll();
+	CTerrainAreaData::ms_AreaPool.FreeAll();
 }

@@ -4,7 +4,7 @@
 #include <assimp/types.h>
 #include <zlib/zlib.h>
 #include <vector>
-
+#include "../../LibMath/source/grid.h"
 
 #if defined(_WIN64)
 #define sys_err(...) fprintf(stderr, __VA_ARGS__), fprintf(stderr, "\n")
@@ -13,7 +13,6 @@
 #define sys_err(...) fprintf(stderr, __VA_ARGS__), fprintf(stderr, "\n")
 #define sys_log(...) fprintf(stdout, __VA_ARGS__), fprintf(stdout, "\n")
 #endif
-
 
 extern GLenum glCheckError_(const char* file, int line);
 
@@ -30,10 +29,12 @@ extern void WriteBinaryFile(const char* pFilename, const void* pData, int size);
 
 extern std::string GetFullPath(const std::string& Dir, const aiString& Path);
 
-extern void SaveIndexRawGz(const std::string& path, const std::vector<GLuint>& data);
-extern void SaveIndexRawGz(const std::string& path, const std::vector<GLfloat>& data);
-extern void LoadIndexRawGz(const std::string& path, std::vector<GLuint>& data);
-extern void LoadIndexRawGz(const std::string& path, std::vector<GLfloat>& data);
+extern void SaveHeightMapRawGz(const std::string& path, const CGrid<float>& heightMap);
+extern void SaveWeightRawGz(const std::string& path, const CGrid<SVector4Df>& weightMap);
+extern void SaveIndexRawGz(const std::string& path, const CGrid<SVector4Di>& indexMap);
+extern void LoadHeightMapRawGz(const std::string& path, CGrid<float>& heightMap);
+extern void LoadWeightRawGz(const std::string& path, CGrid<SVector4Df>& weightMap);
+extern void LoadIndexRawGz(const std::string& path, CGrid<SVector4Df>& indexMap);
 
 extern void create_directory_if_missing(const std::string& path);
 

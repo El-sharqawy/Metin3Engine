@@ -1,110 +1,126 @@
 #version 460 core
-
 #extension GL_ARB_bindless_texture : require
 
 layout (location = 0) out vec4 FragColor;
 
-// Main textures
+// Bindless texture array
 layout(std430, binding = 0) buffer TextureHandles
-{ 
+{
     sampler2D textures[];
 };
 
-// Varyings from vertex shader
+// Weight and index maps
+uniform sampler2D splatWeightMap;      // RGBA32F
+uniform usampler2D splatIndexMap;      // RGBA16UI or RGBA32UI
+
+// Attribute Map
+uniform usampler2D attrsMap;
+
+// Attribute Map
+uniform isampler2D waterMap;
+
+// Terrain parameters
+uniform vec2 u_v2TerrainWorldSize;     // Size in world units (e.g. 512x512)
+uniform vec2 u_v2TerrainOrigin;        // Terrain world offset
+uniform vec2 u_v2TexScale = vec2(16.0); // Tiling control (larger = smaller tiles)
+
+// Optional hit visualization
+uniform bool u_HasHit = false;
+uniform vec3 u_HitPosition;
+uniform int u_HitRadius = 50;
+
+// Varyings
 in vec3 v3WorldPos;
 in vec2 v2TexCoord;
 in vec3 v3Normals;
 
-uniform int iTerrainNum = 0;
-uniform vec2 u_TexScale = vec2(16.0, 16.0); // Bigger = Smaller and more repeated Texture
+uniform int u_iMaxTexturesBlend = 4;
 
-uniform vec3 u_HitPosition;
-uniform int u_HitRadius = 50;
-uniform bool u_HasHit = false;
+// Optional debug
+uniform bool u_DebugVisualizeBlend = false;
+uniform bool u_DebugVisualizeAttrMap = false;
+uniform bool u_DebugVisualizeWater = false;
 
 void main()
 {
-    vec3 albedo = vec3(0.0);
+    // Compute UV into global splatmap
+    vec2 globalUV = (v3WorldPos.xz - u_v2TerrainOrigin) / u_v2TerrainWorldSize;
+    globalUV = clamp(globalUV, vec2(0.0), vec2(1.0)); // Prevent out-of-bounds
 
-    if (iTerrainNum == 0)
+    // Read splat weights and indices
+    vec4 weights = texture(splatWeightMap, globalUV);
+    uvec4 indices = texture(splatIndexMap, globalUV);
+
+    float tileScale = 1.0 / 4.0; // tile every 4 units
+    vec2 tiledUV = v3WorldPos.xz * tileScale;
+
+    // 3) blend up to 4 layers, but skip empty/invalid ones
+    vec3 albedo = vec3(0.0);
+    float totalWeight = 0.0;
+
+    for (int i = 0; i < u_iMaxTexturesBlend; ++i)
     {
-        albedo = vec3(0.7, 0.7f, 0.3f);
+        uint texIndex = indices[i];
+        float texWeight = weights[i];
+
+        // skip if zero weight or invalid texture index (e.g. 255 or out of range)
+        if (texWeight < 0.001 || texIndex >= textures.length() || texIndex == 255)
+            continue;
+
+        albedo += texture(textures[texIndex], tiledUV).rgb * texWeight;
+        totalWeight += texWeight;
     }
-    else if (iTerrainNum == 1)
+
+    // 4) normalize if necessary
+    if (totalWeight > 0.0)
     {
-        albedo = vec3(1.0, 1.0f, 0.0f);
-    }
-    else if (iTerrainNum == 2)
-    {
-        albedo = vec3(0.0, 1.0f, 0.0f);
-    }
-    else if (iTerrainNum == 3)
-    {
-        albedo = vec3(0.0, 0.0f, 1.0f);
-    }
-    else if (iTerrainNum == 4)
-    {
-        albedo = vec3(0.7, 0.3f, 0.2f);
-    }
-    else if (iTerrainNum == 5)
-    {
-        albedo = vec3(0.3, 0.7f, 0.2f);
-    }
-    else if (iTerrainNum == 6)
-    {
-        albedo = vec3(0.3, 0.2f, 0.7f);
-    }
-    else if (iTerrainNum == 7)
-    {
-        albedo = vec3(0.7, 0.7f, 0.2f);
-    }
-    else if (iTerrainNum == 8)
-    {
-        albedo = vec3(0.2, 0.9f, 0.8f);
-    }
-    else if (iTerrainNum == 9)
-    {
-        albedo = vec3(0.9, 0.3f, 0.9f);
-    }
-    else if (iTerrainNum == 10)
-    {
-        albedo = vec3(0.3, 0.3f, 0.8f);
-    }
-    else if (iTerrainNum == 11)
-    {
-        albedo = vec3(0.8, 0.5f, 0.8f);
-    }
-    else if (iTerrainNum == 12)
-    {
-        albedo = vec3(0.1, 0.3f, 0.5f);
-    }
-    else if (iTerrainNum == 13)
-    {
-        albedo = vec3(0.9, 0.3f, 0.5f);
-    }
-    else if (iTerrainNum == 14)
-    {
-        albedo = vec3(0.0, 0.5f, 0.5f);
-    }
-    else if (iTerrainNum == 15)
-    {
-        albedo = vec3(0.5, 0.0f, 0.5f);
+        albedo /= totalWeight;
     }
     else
     {
-        albedo = vec3(0.5, 0.5f, 0.5f);
+        // fallback to base texture 0 if no weights
+        albedo = texture(textures[0], tiledUV).rgb;
     }
 
-    if (u_HasHit)
+    // Optional debug mode: show blend weights as color
+    if (u_DebugVisualizeBlend)
     {
-        float dist = length(v3WorldPos.xz - u_HitPosition.xz);
-        float edge = 2.0;
-        float thickness = 0.3;
-
-        float ring = smoothstep(u_HitRadius - thickness, u_HitRadius, dist) * (1.0 - smoothstep(u_HitRadius, u_HitRadius + thickness, dist));
-
-        vec3 ringColor = vec3(1.0, 0.2, 0.2);
-        albedo = mix(albedo, ringColor, ring);
+        FragColor = vec4(weights.rgb, 1.0);
+        return;
     }
-    FragColor = vec4(albedo, 1.0f);
+
+    if (u_DebugVisualizeAttrMap)
+    {
+        uint AttrMap = texture(attrsMap, globalUV).r;
+        if (AttrMap == 1u) // Attribute 1...
+           FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+        else if (AttrMap == 2u) // Check Attribute 2 flag
+           FragColor = vec4(0.0, 1.0, 0.0, 1.0);
+        else if (AttrMap == 3u) // Check Attribute 3 flag
+           FragColor = vec4(0.0, 1.0, 1.0, 1.0);
+        else
+        {
+            FragColor = vec4(0.5, 0.5.r, 0.5.r, 1.0);
+        }
+        
+        return;    
+    }
+
+    if (u_DebugVisualizeWater)
+    {
+        // Sample water map
+        int waterValue = texture(waterMap, globalUV).r;
+        if (waterValue != 255) // Water flag
+        {
+            FragColor = vec4(0.0, 0.0, 1.0, 1.0); // Blue for water
+        }
+        else
+        {
+            FragColor = vec4(0.5, 0.5.r, 0.5.r, 1.0);
+        }
+        return;
+    }
+
+    // Blend final result
+    FragColor = vec4(albedo, 1.0);
 }

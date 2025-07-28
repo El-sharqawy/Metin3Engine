@@ -15,13 +15,13 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="source\window.cpp">
+    <ClCompile Include="source\Window.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="source\camera.cpp">
+    <ClCompile Include="source\Camera.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="source\utils.cpp">
+    <ClCompile Include="source\Utils.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="source\stb_image.cpp">
@@ -30,45 +30,39 @@
     <ClCompile Include="source\stb_image_write.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="source\shader.cpp">
+    <ClCompile Include="source\Shader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="source\base_shader.cpp">
+    <ClCompile Include="source\BaseShader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="source\model.cpp">
+    <ClCompile Include="source\Texture.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="source\mesh.cpp">
+    <ClCompile Include="source\Screen.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="source\texture.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="source\screen.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="source\frame_buffer.cpp">
+    <ClCompile Include="source\FrameBuffer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="source\glad.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="source\stdafx.cpp">
+    <ClCompile Include="source\Stdafx.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="source\window.h">
+    <ClInclude Include="source\Window.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="source\camera.h">
+    <ClInclude Include="source\Camera.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="source\singleton.h">
+    <ClInclude Include="source\Singleton.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="source\utils.h">
+    <ClInclude Include="source\Utils.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="source\stb_image_write.h">
@@ -77,28 +71,22 @@
     <ClInclude Include="source\stb_image.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="source\shader.h">
+    <ClInclude Include="source\Shader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="source\base_shader.h">
+    <ClInclude Include="source\BaseShader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="source\mesh.h">
+    <ClInclude Include="source\Texture.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="source\model.h">
+    <ClInclude Include="source\Screen.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="source\texture.h">
+    <ClInclude Include="source\FrameBuffer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="source\screen.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="source\frame_buffer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="source\stdafx.h">
+    <ClInclude Include="source\Stdafx.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

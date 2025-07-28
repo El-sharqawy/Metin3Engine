@@ -1,5 +1,11 @@
 #include "stdafx.h"
 #include "userinterface.h"
+#include "../../LibTerrain/source/TerrainManager.h"
+#include "../../LibTerrain/source/TerrainData.h"
+#include "../../LibTerrain/source/Textureset.h"
+#include "../../LibTerrain/source/Terrain.h"
+#include "../../LibTerrain/source/TerrainMap.h"
+#include "../../LibGame/source/SkyBox.h"
 
 #if defined(_WIN64)
 #undef min
@@ -46,26 +52,6 @@ CUserInterface::CUserInterface(CWindow* pWindow)
 CUserInterface::~CUserInterface()
 {
 	Destroy();
-}
-
-void CUserInterface::SetupTextureSet()
-{
-	m_vTextureNames.clear();
-
-	/*// Create list of texture names for the ListBox
-	for (size_t i = 0; i < CTerrainManager::Instance().GetTextureSet()->GetTexturesCount(); i++) // Currently Limited to only 4 textures, TODO : make it unlimited !
-	{
-		if (i == 0)
-		{
-			m_vTextureNames.push_back("Eraser");
-			continue;
-		}
-		const auto& tex = CTerrainManager::Instance().GetTextureSet()->GetTexture(i);
-		if (tex.m_pTexture)  // Or check tex.m_pTexture != nullptr
-		{
-			m_vTextureNames.push_back(tex.m_pTexture->GetTextureName().c_str());
-		}
-	}*/
 }
 
 void CUserInterface::Destroy()
@@ -271,6 +257,8 @@ void CUserInterface::RenderTerrainUI()
 	static bool bIsEditing = pTerrainManager->IsEditing();
 	static bool bIsEditingHeight = pTerrainManager->IsEditingHeight();
 	static bool bIsEditingTextures = pTerrainManager->IsEditingTexture();
+	static bool bIsEditingAttribute = pTerrainManager->IsEditingAttribute();
+	static bool bIsEditingWater = pTerrainManager->IsEditingWater();
 
 	ImVec2 buttonSize(125, 25);
 
@@ -284,14 +272,53 @@ void CUserInterface::RenderTerrainUI()
 	{
 		GLint iBrushRadius = pTerrainManager->GetBrushSize();
 		GLint iBrushStrength = pTerrainManager->GetBrushStrength();
+		GLint iBrushShape = pTerrainManager->GetBrushShape();
 
 		if (ImGui::SliderInt("Brush Radius", &iBrushRadius, 0, 50))
 		{
 			pTerrainManager->SetBrushSize(iBrushRadius);
 		}
-		if (ImGui::SliderInt("Brush Strength", &iBrushStrength, 0, 50))
+		if (ImGui::SliderInt("Brush Strength", &iBrushStrength, 0, 250))
 		{
 			pTerrainManager->SetBrushStrength(iBrushStrength);
+		}
+
+		const char* brushShapes[] = { "No Brush Shape", "Circle Brush", "Square Brush" };
+		static int current_brush_shape = 0; // Index of the selected item
+		if (ImGui::BeginCombo("Terrain Brush", brushShapes[current_brush_shape])) // The second parameter is the label previewed before opening the combo.
+		{
+			for (int n = 0; n < arr_size(brushShapes); n++)
+			{
+				bool is_selected = (current_brush_shape == n);
+				if (ImGui::Selectable(brushShapes[n], is_selected))
+				{
+					current_brush_shape = n;
+					// Update terrain Brush Shape
+					switch (current_brush_shape)
+					{
+					case 0: // Disable Brush
+						pTerrainManager->SetBrushShape(BRUSH_SHAPE_NONE);
+						break;
+
+					case 1: // Circle Brush
+						pTerrainManager->SetBrushShape(BRUSH_SHAPE_CIRCLE);
+						break;
+
+					case 2: // Square Brush
+						pTerrainManager->SetBrushShape(BRUSH_SHAPE_SQUARE);
+						break;
+
+					default:
+						pTerrainManager->SetBrushShape(BRUSH_TYPE_NONE);
+						break;
+					}
+					if (is_selected)
+					{
+						ImGui::SetItemDefaultFocus();   // set the initial focus when opening the combo (scrolling + for keyboard navigation support)
+					}
+				}
+			}
+			ImGui::EndCombo();
 		}
 
 		if (ImGui::Checkbox("Height Editing", &bIsEditingHeight))
@@ -299,16 +326,20 @@ void CUserInterface::RenderTerrainUI()
 			if (bIsEditingHeight)
 			{
 				bIsEditingTextures = false;
+				bIsEditingAttribute = false;
+				bIsEditingWater = false;
 			}
 			pTerrainManager->SetEditingHeight(bIsEditingHeight);
 			pTerrainManager->SetEditingTexture(bIsEditingTextures);
+			pTerrainManager->SetEditingAttribute(bIsEditingAttribute);
+			pTerrainManager->SetEditingWater(bIsEditingWater);
 		}
 
 		if (bIsEditingHeight)
 		{
 			const char* items[] = { "No Brush", "Up Brush", "Down Brush", "Flatten Brush", "Smooth Brush", "Noise Brush" };
 			static int current_item = 0; // Index of the selected item
-			if (ImGui::BeginCombo("Terrain Brush", items[current_item])) // The second parameter is the label previewed before opening the combo.
+			if (ImGui::BeginCombo("Height Brush", items[current_item])) // The second parameter is the label previewed before opening the combo.
 			{
 				for (int n = 0; n < arr_size(items); n++)
 				{
@@ -364,15 +395,19 @@ void CUserInterface::RenderTerrainUI()
 			if (bIsEditingTextures)
 			{
 				bIsEditingHeight = false;
+				bIsEditingAttribute = false;
+				bIsEditingWater = false;
 			}
 			pTerrainManager->SetEditingHeight(bIsEditingHeight);
 			pTerrainManager->SetEditingTexture(bIsEditingTextures);
+			pTerrainManager->SetEditingAttribute(bIsEditingAttribute);
+			pTerrainManager->SetEditingWater(bIsEditingWater);
 		}
 
 		if (bIsEditingTextures)
 		{
 			static int selectedTextureIndex = -1;
-			CTerrainTextureSet* pTerrainTexture = CTerrain::GetTextureSet();
+			CTerrainTextureset* pTerrainTexture = CTerrain::GetTerrainTextureset();
 
 			std::vector<const char*> textureNames;
 			for (size_t i = 0; i < pTerrainTexture->GetTexturesCount(); i++) // Currently Limited to only 4 textures, TODO : make it unlimited !
@@ -465,9 +500,110 @@ void CUserInterface::RenderTerrainUI()
 			}
 
 		}
+
+		if (ImGui::Checkbox("Attributes Editing", &bIsEditingAttribute))
+		{
+			if (bIsEditingAttribute)
+			{
+				bIsEditingHeight = false;
+				bIsEditingTextures = false;
+				bIsEditingWater = false;
+			}
+			pTerrainManager->SetEditingHeight(bIsEditingHeight);
+			pTerrainManager->SetEditingTexture(bIsEditingTextures);
+			pTerrainManager->SetEditingAttribute(bIsEditingAttribute);
+			pTerrainManager->SetEditingWater(bIsEditingWater);
+		}
+
+		if (bIsEditingAttribute)
+		{
+			const char* attrs_brsuhes[] = { "Attribute Block", "Attribute Safe Area ",};
+			static int current_attr_brush = 0; // Index of the selected item
+			if (ImGui::BeginCombo("Attributes Brush", attrs_brsuhes[current_attr_brush])) // The second parameter is the label previewed before opening the combo.
+			{
+				for (int n = 0; n < arr_size(attrs_brsuhes); n++)
+				{
+					bool is_selected = (current_attr_brush == n);
+					if (ImGui::Selectable(attrs_brsuhes[n], is_selected))
+					{
+						current_attr_brush = n;
+						// Update terrain edit mode based on selection
+
+						switch (current_attr_brush)
+						{
+						case 0: // set Block As default
+							pTerrainManager->SetAttributeType(TERRAIN_ATTRIBUTE_BLOCK);
+							break;
+
+						case 1: // Up Brush
+							pTerrainManager->SetAttributeType(TERRAIN_ATTRIBUTE_SAFE);
+							break;
+
+						default:
+							pTerrainManager->SetAttributeType(TERRAIN_ATTRIBUTE_BLOCK);
+							break;
+						}
+
+						if (is_selected)
+						{
+							ImGui::SetItemDefaultFocus();   // set the initial focus when opening the combo (scrolling + for keyboard navigation support)
+						}
+					}
+				}
+				ImGui::EndCombo();
+			}
+			static bool bEraseCurrentAttr = pTerrainManager->IsErasingAttribute();
+			static bool bEraseAllAttrs = false;
+
+			if (ImGui::Checkbox("Erase Current Attr", &bEraseCurrentAttr))
+			{
+				pTerrainManager->SetErasingAttribute(bEraseCurrentAttr);
+			}
+			ImGui::SameLine();
+			if (ImGui::Checkbox("Erase All Attrs", &bEraseAllAttrs))
+			{
+				pTerrainManager->SetErasingAttribute(!bEraseAllAttrs);
+				if (bEraseAllAttrs)
+				{
+					pTerrainManager->SetAttributeType(TERRAIN_ATTRIBUTE_NONE);
+				}
+			}
+		}
+
+		if (ImGui::Checkbox("Water Editing", &bIsEditingWater))
+		{
+			if (bIsEditingWater)
+			{
+				bIsEditingHeight = false;
+				bIsEditingTextures = false;
+				bIsEditingAttribute = false;
+			}
+			pTerrainManager->SetEditingHeight(bIsEditingHeight);
+			pTerrainManager->SetEditingTexture(bIsEditingTextures);
+			pTerrainManager->SetEditingAttribute(bIsEditingAttribute);
+			pTerrainManager->SetEditingWater(bIsEditingWater);
+		}
+
+		if (bIsEditingWater)
+		{
+			GLfloat fWaterHeight = pTerrainManager->GetWaterBrushHeight();
+			if (ImGui::DragFloat("Water Height", &fWaterHeight, 0.25, -50.0, 50.0))
+			{
+				pTerrainManager->SetWaterBrushHeight(fWaterHeight);
+			}
+			static bool bEraseWater = pTerrainManager->IsErasingWater();
+			if (ImGui::Checkbox("Erase Water", &bEraseWater))
+			{
+				pTerrainManager->SetErasingWater(bEraseWater);
+			}
+		}
 	}
 }
 
+void CUserInterface::RenderSkyBoxUI()
+{
+	CSkyBox::Instance().SetGUI();
+}
 void CUserInterface::Render()
 {
 	ImGui::Begin("Terrain Tools");
@@ -484,11 +620,31 @@ void CUserInterface::Render()
 			RenderTerrainUI();
 			ImGui::EndTabItem();
 		}
+
+		if (ImGui::BeginTabItem("SkyBox"))
+		{
+			RenderSkyBoxUI();
+			ImGui::EndTabItem();
+		}
+
 		ImGui::EndTabBar();
 	}
 
+	auto reflectionTex = m_pWindow->GetTerrainManager()->GetTerrainMapPtr()->GetReflectionFBOPtr();
+	if (reflectionTex->GetTextureID())
+	{
+		ImGui::Image((ImTextureID)(intptr_t)reflectionTex->GetTextureID(), ImVec2(128, 128), ImVec2(0, 0), ImVec2(1, 1), ImVec4(1, 1, 1, 1), ImVec4(1, 1, 1, 0.5));
+	}
+
+	auto refractionTex = m_pWindow->GetTerrainManager()->GetTerrainMapPtr()->GetRefractionFBOPtr();
+	if (refractionTex->GetTextureID())
+	{
+		ImGui::Image((ImTextureID)(intptr_t)refractionTex->GetTextureID(), ImVec2(128, 128), ImVec2(0, 0), ImVec2(1, 1), ImVec4(1, 1, 1, 1), ImVec4(1, 1, 1, 0.5));
+	}
 
 	ImGui::InputFloat3("Camera Position", (float*)&CCameraManager::Instance().GetCurrentCamera()->GetPosition()[0]);
+	ImGui::InputFloat3("Camera Target", (float*)&CCameraManager::Instance().GetCurrentCamera()->GetTarget()[0]);
+	ImGui::InputFloat3("Intersection Position", (float*)&m_pWindow->GetTerrainManager()->GetTerrainMapPtr()->GetIntersectionPoint()[0]);
 
 	ImGui::NewLine();
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);

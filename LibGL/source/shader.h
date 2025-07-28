@@ -2,8 +2,10 @@
 
 #include "../../LibMath/source/stdafx.h"
 #include <string>
-#include "base_shader.h"
+#include "BaseShader.h"
 #include <list>
+
+struct SShaderProgramDefinitions;
 
 class CShader
 {
@@ -16,7 +18,9 @@ public:
 
 	CShader* AttachShader(const CBaseShader& shader);
 
-	void LinkPrograms();
+	bool LinkPrograms();
+
+	bool LoadFromDefinition(const SShaderProgramDefinitions& def);
 
 	/* the program ID */
 	GLuint GetID() const;
@@ -28,6 +32,7 @@ public:
 	bool IsLinked() const;
 
 	std::string GetName() const;
+	void SetName(const std::string& stShaderProgramName);
 
 	/* utility uniform functions */
 	void setBool(const std::string& name, bool value) const;
@@ -53,6 +58,8 @@ public:
 
 	void setSampler2D(const std::string& name, GLuint iTextureID, GLint iTexValue) const;
 	void setSampler3D(const std::string& name, GLuint iTextureID, GLint iTexValue) const;
+
+	void setBindlessSampler2D(const std::string& name, GLuint64 value) const;
 
 protected:
 	/* the program ID */

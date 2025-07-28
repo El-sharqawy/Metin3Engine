@@ -3,16 +3,23 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <string>
-#include "camera.h"
-#include "frame_buffer.h"
+#include "Camera.h"
+#include "FrameBuffer.h"
+#include "../../LibGame/source/ResourcesManager.h"
+#include "../../LibGame/source/PhysicsWorld.h"
 
 constexpr auto DEFAULT_WINDOW_WIDTH = 1260;
 constexpr auto DEFAULT_WINDOW_HEIGHT = 960;
 
 class CScreen;
 class CTerrainManager;
+class CSkyBox;
+class CScreenSpaceShader;
+class CTerrainAreaData;
+class CMesh;
+class CShader;
 
-class CWindow
+class CWindow : public CSingleton<CWindow>
 {
 public:
 	/* OpenGL Functions */
@@ -45,6 +52,10 @@ public:
 
 	static CTerrainManager* GetTerrainManager();
 
+	CSkyBox* GetSkyBox() { return m_pSkyBox; }
+	CScreenSpaceShader& GetScreenSpaceShader() { return *m_pScreenSpaceShader; }
+	CScreenSpaceShader* GetScreenSpaceShaderPtr() { return m_pScreenSpaceShader; }
+
 protected:
 	void Destroy();
 
@@ -62,6 +73,8 @@ protected:
 
 public: // Singleton Classes
 	CCameraManager camera_manager;
+	CResourcesManager resources_manager;
+	CPhysicsWorld physics_world;
 
 private:
 	GLFWwindow* m_pWindow;
@@ -79,4 +92,6 @@ private:
 	CFrameBuffer* m_pFrameBufObj;
 	CScreen* m_pScreen;
 	static CTerrainManager* m_pTerrainManager;
+	CSkyBox *m_pSkyBox;
+	CScreenSpaceShader* m_pScreenSpaceShader;
 };

@@ -510,7 +510,7 @@ public:
 
 		SVector4Df Row0(Inverse.mat4[0][0], Inverse.mat4[1][0], Inverse.mat4[2][0], Inverse.mat4[3][0]);
 
-		SVector4Df Dot0(mat4[0] * Row0);
+		SVector4Df Dot0 = SVector4Df(mat4[0]) * Row0;
 
 		float Dot1 = (Dot0.x + Dot0.y) + (Dot0.z + Dot0.w);
 
@@ -590,6 +590,29 @@ public:
 		return inverseMatrix;
 	}
 
+	// transforms a 3D point (SVector3Df) by the 4x4 matrix (including translation, rotation, and scale):
+	SVector3Df TransformPoint(const SVector3Df& v) const
+	{
+		// Assuming mat4 is a 4x4 float array: mat4[row][col]
+		float x = v.x, y = v.y, z = v.z;
+		float tx =
+			mat4[0][0] * x + mat4[0][1] * y + mat4[0][2] * z + mat4[0][3];
+		float ty =
+			mat4[1][0] * x + mat4[1][1] * y + mat4[1][2] * z + mat4[1][3];
+		float tz =
+			mat4[2][0] * x + mat4[2][1] * y + mat4[2][2] * z + mat4[2][3];
+		float tw =
+			mat4[3][0] * x + mat4[3][1] * y + mat4[3][2] * z + mat4[3][3];
+
+		// Homogeneous divide (if w != 1)
+		if (tw != 0.0f && tw != 1.0f)
+		{
+			tx /= tw;
+			ty /= tw;
+			tz /= tw;
+		}
+		return SVector3Df(tx, ty, tz);
+	}
 
 	/**
 	 * Initializes the matrix to zero using memset.
@@ -598,7 +621,7 @@ public:
 	 */
 	void InitMemZero()
 	{
-		arr_mem_zero_ref(mat4);
+		arr_mem_zero(mat4);
 	}
 
 	/**
