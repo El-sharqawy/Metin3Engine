@@ -56,4 +56,4 @@ private:
 	GLuint m_uiWorldBuffer;
 
 	GLuint m_uiMaxInstances; // Current buffer capacity for instancing
-}
+};
