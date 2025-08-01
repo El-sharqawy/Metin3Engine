@@ -78,6 +78,26 @@ public:
 		m_v3End = m_v3Start + m_fRayRange * m_v3Dir;
 	}
 
+	const SVector3Df& GetOrigin() const
+	{
+		return(m_v3Start);
+	}
+
+	const SVector3Df& GetStartPoint() const
+	{
+		return(m_v3Start);
+	}
+
+	const SVector3Df& GetEndPoint() const
+	{
+		return(m_v3End);
+	}
+
+	const SVector3Df& GetDirection() const
+	{
+		return (m_v3Dir);
+	}
+
 private:
 	SVector3Df m_v3Start;
 	SVector3Df m_v3End;

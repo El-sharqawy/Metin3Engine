@@ -68,18 +68,19 @@ public:
 
 	// Set the Map to intersect with
 	void SetTerrainMap(CTerrainMap* pTerrainMap);
+	CTerrainMap* GetTerrainMap();
 
 	void SetBoundingBoxLocal(const TBoundingBox& boundBox);
+	TBoundingBox GetBoundingBoxLocal() const;
 
-	TBoundingBox GetBoundingBoxLocal() const
-	{
-		return m_BoundingBoxLocal;
-	}
+	void SetBoundingBoxWorld(const TBoundingBox& boundBoxWorld);
+	TBoundingBox GetBoundingBoxWorld() const;
 
-	TBoundingBox GetBoundingBoxWorld() const
-	{
-		return m_BoundingBoxWorld;
-	}
+	bool IsSelectedObject() const;
+	void SetSelectedObject(bool bSelected);
+
+	GLint64 GetObjectID() const;
+	void SetObjectID(GLint64 lObjID);
 
 public:
 	// Physics step: update position and velocity based on acceleration, gravity, and friction
@@ -116,28 +117,32 @@ public:
 	void Launch(GLfloat fSpeed, GLfloat fElevationDeg, GLfloat fAzimuthDeg = 0.0f);
 
 private:
-	CWorldTranslation m_WorldTranslation; // World Translation of the object (position, scale, rotation, height)
-	SVector3Df m_v3Velocity; // Velocity vector
-	SVector3Df m_v3Acceleration; // Acceleration vector
+	CWorldTranslation m_WorldTranslation;	// World Translation of the object (position, scale, rotation, height)
+	SVector3Df m_v3Velocity;				// Velocity vector
+	SVector3Df m_v3Acceleration;			// Acceleration vector
 
-	GLfloat m_fMass; // Mass of the object
-	GLfloat m_fFriction; // Friction coefficient
-	GLfloat m_fGravityVal; // world's gravity
+	GLfloat m_fMass;						// Mass of the object
+	GLfloat m_fFriction;					// Friction coefficient
+	GLfloat m_fGravityVal;					// world's gravity
 
-	bool m_bUseGravity; // Whether the object is affected by gravity
-	bool m_bIsCollidable; // Whether the object can collide with other objects
-	bool m_bIsOnGround;	// Whether the object is currently on the ground
+	bool m_bUseGravity;						// Whether the object is affected by gravity
+	bool m_bIsCollidable;					// Whether the object can collide with other objects
+	bool m_bIsOnGround;						// Whether the object is currently on the ground
 
-	EObjectTypes m_ePhysicsType; // Type of physics behavior (static, dynamic, kinematic)
+	EObjectTypes m_ePhysicsType;			// Type of physics behavior (static, dynamic, kinematic)
 
-	SVector3Df m_v3AngularVelocity; // Angular velocity (radians/sec)
-	SVector3Df m_v3Torque;          // Accumulated torque for this frame
+	SVector3Df m_v3AngularVelocity;			// Angular velocity (radians/sec)
+	SVector3Df m_v3Torque;					// Accumulated torque for this frame
 
-	GLfloat m_fMomentOfInertia; // For simplicity, same for all axes (can be a vector for per-axis)
-	GLfloat m_fRestitution; // 0 = no bounce, 1 = perfect bounce
+	GLfloat m_fMomentOfInertia;				// For simplicity, same for all axes (can be a vector for per-axis)
+	GLfloat m_fRestitution;					// 0 = no bounce, 1 = perfect bounce
 
-	CTerrainMap* m_pTerrainMap;	// The current map the object within
+	CTerrainMap* m_pTerrainMap;				// The current map the object within
 
-	TBoundingBox m_BoundingBoxLocal;  // Model-space AABB
-	TBoundingBox m_BoundingBoxWorld;  // World-space AABB (updated each frame)
+	TBoundingBox m_BoundingBoxLocal;		// Model-space AABB
+	TBoundingBox m_BoundingBoxWorld;		// World-space AABB (updated each frame)
+
+	bool m_bSelectedObject;					// Is the object selected in the editor or game
+
+	GLint64 m_lObjectID;					// Unique ID for the object, can be used for selection or identification
 };

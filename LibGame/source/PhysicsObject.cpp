@@ -28,6 +28,8 @@ void CPhysicsObject::Reset()
 	m_fMomentOfInertia = 1.0f; // Default moment of inertia for simplicity
 	m_fRestitution = 0.5f; // 0 = no bounce, 1 = perfect bounce
 	m_pTerrainMap = nullptr;
+	m_bSelectedObject = false;
+	m_lObjectID = 0;
 }
 
 const SVector3Df& CPhysicsObject::GetPosition() const
@@ -205,13 +207,54 @@ void CPhysicsObject::SetTerrainMap(CTerrainMap* pTerrainMap)
 	m_pTerrainMap = pTerrainMap;
 }
 
+CTerrainMap* CPhysicsObject::GetTerrainMap()
+{
+	return (m_pTerrainMap);
+}
+
 void CPhysicsObject::SetBoundingBoxLocal(const TBoundingBox& boundBox)
 {
 	m_BoundingBoxLocal = boundBox;
 }
 
+TBoundingBox CPhysicsObject::GetBoundingBoxLocal() const
+{
+	return m_BoundingBoxLocal;
+}
+
+void CPhysicsObject::SetBoundingBoxWorld(const TBoundingBox& boundBoxWorld)
+{
+	m_BoundingBoxWorld = boundBoxWorld;
+}
+
+TBoundingBox CPhysicsObject::GetBoundingBoxWorld() const
+{
+	return m_BoundingBoxWorld;
+}
+
+bool CPhysicsObject::IsSelectedObject() const
+{
+	return (m_bSelectedObject);
+}
+
+void CPhysicsObject::SetSelectedObject(bool bSelected)
+{
+	m_bSelectedObject = bSelected;
+}
+
+GLint64 CPhysicsObject::GetObjectID() const
+{
+	return (m_lObjectID);
+}
+
+void CPhysicsObject::SetObjectID(GLint64 lObjID)
+{
+	m_lObjectID = lObjID;
+}
+
 void CPhysicsObject::Update(float fDeltaTime)
 {
+	// Updating Object Physics
 	if (GetType() == OBJECT_TYPE_NONE || GetType() == OBJECT_TYPE_STATIC)
 	{
 		return;

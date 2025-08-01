@@ -86,7 +86,7 @@ protected:
 	// The area num among terrains (0,0) - (1, 0) - (1, 1);
 	GLint m_iAreaCoordX, m_iAreaCoordZ;
 
-	CAABBVisualizer AABB;
+	GLint m_iAreaNum;
 
 public:
 	static void DestroySystem();

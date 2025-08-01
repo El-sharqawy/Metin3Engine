@@ -7,6 +7,7 @@
 #include <memory>
 #include "../../LibGL/source/stdafx.h"
 #include <limits>
+#include "../../LibGL/source/Screen.h"
 
 typedef struct SBoundingSphere
 {
@@ -175,51 +176,28 @@ typedef struct SBoundingBox
 			(v3Min.z <= other.v3Max.z && v3Max.z >= other.v3Min.z);
 	}
 
+	void Draw(bool hIsSelectedObject)
+	{
+		if (hIsSelectedObject)
+		{
+			CWindow::Instance().GetScreen()->SetDiffuseColor(1.0f, 0.0f, 0.0f, 1.0f); // Red for selected object
+		}
+		else
+		{
+			CWindow::Instance().GetScreen()->SetDiffuseColor(1.0f, 1.0f, 1.0f, 1.0f); // white for non selected object
+		}
+		CWindow::Instance().GetScreen()->RenderLinedBox3d(*this);
+	}
+
 } TBoundingBox;
 
 
 class CAABBVisualizer
 {
 public:
-	void Initialize()
-	{
-		glGenVertexArrays(1, &m_uiVAO);
-		glGenBuffers(1, &m_uiVBO);
-		m_pLineShader = nullptr;
-	}
-
 	void Draw(const SVector3Df& min, const SVector3Df& max)
 	{
-		assert(m_pLineShader);
-		m_pLineShader->Use();
-		m_pLineShader->setMat4("ViewMatrix", CCameraManager::Instance().GetCurrentCamera()->GetViewProjMatrix());
-
-		SVector3Df corners[8] = {
-			{min.x, min.y, min.z}, {max.x, min.y, min.z},
-			{max.x, max.y, min.z}, {min.x, max.y, min.z},
-			{min.x, min.y, max.z}, {max.x, min.y, max.z},
-			{max.x, max.y, max.z}, {min.x, max.y, max.z}
-		};
-
-		// Indices for the 12 edges of the box
-		GLuint indices[] = {
-			0,1, 1,2, 2,3, 3,0, // bottom face
-			4,5, 5,6, 6,7, 7,4, // top face
-			0,4, 1,5, 2,6, 3,7  // vertical lines
-		};
-
-		std::vector<SVector3Df> lines;
-		for (int i = 0; i < 24; i++)
-			lines.push_back(corners[indices[i]]);
-
-		glBindVertexArray(m_uiVAO);
-		glBindBuffer(GL_ARRAY_BUFFER, m_uiVBO);
-		glBufferData(GL_ARRAY_BUFFER, lines.size() * sizeof(SVector3Df), lines.data(), GL_DYNAMIC_DRAW);
-		glEnableVertexAttribArray(0);
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
-
-		// Use your line shader and set the viewProj matrix
-		glDrawArrays(GL_LINES, 0, (GLsizei)lines.size());
+		CWindow::Instance().GetScreen()->RenderLinedBox3d(min.x, min.y, min.z, max.x, max.y, max.z);
 	}
 
 	void SetBoundingBox(const TBoundingBox& localAABB, const SVector3Df& v3Pos)
@@ -234,21 +212,10 @@ public:
 		return (m_BoundingBoxWorld);
 	}
 
-	void SetBoundingBoxShader(CShader* pLineShader)
-	{
-		m_pLineShader = pLineShader;
-	}
-
-	CShader* GetShader()
-	{
-		return (m_pLineShader);
-	}
-
 private:
-	GLuint m_uiVAO = 0, m_uiVBO = 0;
-	CShader* m_pLineShader;
 	TBoundingBox m_BoundingBoxLocal;  // Local-space bounding box (relative to origin)
 	TBoundingBox m_BoundingBoxWorld;  // World-space bounding box (updated each frame)};
+	SVector4Df m_v4Color = SVector4Df(1.0f, 0.0f, 0.0f, 1.0f); // Default color (white)
 };
 
 class CBoundingSphereVisualizer

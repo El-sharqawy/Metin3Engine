@@ -4,11 +4,9 @@
 
 CTerrainAreaData::CTerrainAreaData()
 {
-	AABB.Initialize();
-	AABB.SetBoundingBoxShader(CResourcesManager::Instance().GetShader("ScreenLines"));
-
 	m_iAreaCoordX = m_iAreaCoordZ = 0; // Reset area coordinates
 	m_pOwnerTerrainMap = nullptr; // Initialize owner terrain map pointer to nullptr
+
 	Clear();
 }
 
@@ -19,6 +17,7 @@ CTerrainAreaData::~CTerrainAreaData()
 
 void CTerrainAreaData::Clear()
 {
+	m_iAreaNum = 0;
 	m_vObjectsGroups.clear();
 }
 
@@ -41,6 +40,7 @@ void CTerrainAreaData::Destroy()
 
 void CTerrainAreaData::SetTerrainAreaDataMap(CTerrainMap* pMap)
 {
+	assert(pMap != nullptr);
 	m_pOwnerTerrainMap = pMap;
 }
 
@@ -74,7 +74,7 @@ void CTerrainAreaData::AddObjectInstanceGroup(CShader* pShader, CMesh* pMesh, co
 	{
 		if (group.pShader == pShader && group.pMesh == pMesh)
 		{
-			newObjectData->uiObjectID = group.vecObjects.size() + 1; // Assign a unique ID based on the current size of the group
+			newObjectData->uiObjectID = group.GetInstanceCount() + 1; // Assign a unique ID based on the current size of the group
 			// Group exists, add the object data
 			group.vecObjects.push_back(newObjectData);				// 1. Pointer is added to the render group
 			return;													// 2. Function exits
@@ -163,9 +163,9 @@ void CTerrainAreaData::RenderAreaObjects(GLfloat fDeltaTime)
 		if (!visibleWorldMatrices.empty())
 		{
 			group.pShader->Use();
-			group.pMesh->Update(fDeltaTime);
+			//group.pMesh->Update(fDeltaTime);
 			// Pass the temporary vectors of VISIBLE objects to the render function
-			group.pMesh->Render(visibleWorldMatrices.size(), visibleWvpMatrices, visibleWorldMatrices);
+			group.pMesh->Render(group.GetInstanceCount(), visibleWvpMatrices, visibleWorldMatrices);
 
 			for (auto& objectData : group.vecObjects)
 			{
@@ -177,7 +177,8 @@ void CTerrainAreaData::RenderAreaObjects(GLfloat fDeltaTime)
 					SBoundingBox worldBox = objectData->pPhysicsObject->GetBoundingBoxWorld();
 
 					// 4. Draw the correctly transformed box
-					AABB.Draw(worldBox.v3Min, worldBox.v3Max);
+					//AABB.Draw(worldBox.v3Min, worldBox.v3Max);
+					worldBox.Draw(objectData->pPhysicsObject->IsSelectedObject());
 				}
 			}
 		}
@@ -327,20 +328,40 @@ bool CTerrainAreaData::SaveAreaObjectsFromFile(const std::string& stMapName)
 			idsJson.push_back(obj->uiObjectID);
 			typesJson.push_back(obj->eObjectType);
 
-			const SVector3Df& pos = obj->WorldTranslation.GetPosition();
-			positionsJson.push_back(pos.x);
-			positionsJson.push_back(pos.y);
-			positionsJson.push_back(pos.z);
+			if (obj->pPhysicsObject)
+			{
+				const SVector3Df& pos = obj->pPhysicsObject->GetPosition();
+				positionsJson.push_back(pos.x);
+				positionsJson.push_back(pos.y);
+				positionsJson.push_back(pos.z);
 
-			const SVector3Df& rot = obj->WorldTranslation.GetRotation();
-			rotationsJson.push_back(rot.x);
-			rotationsJson.push_back(rot.y);
-			rotationsJson.push_back(rot.z);
+				const SVector3Df& rot = obj->pPhysicsObject->GetRotation();
+				rotationsJson.push_back(rot.x);
+				rotationsJson.push_back(rot.y);
+				rotationsJson.push_back(rot.z);
 
-			const SVector3Df& scale = obj->WorldTranslation.GetScale();
-			scalesJson.push_back(scale.x);
-			scalesJson.push_back(scale.y);
-			scalesJson.push_back(scale.z);
+				const SVector3Df& scale = obj->pPhysicsObject->GetScale();
+				scalesJson.push_back(scale.x);
+				scalesJson.push_back(scale.y);
+				scalesJson.push_back(scale.z);
+			}
+			else
+			{
+				const SVector3Df& pos = obj->WorldTranslation.GetPosition();
+				positionsJson.push_back(pos.x);
+				positionsJson.push_back(pos.y);
+				positionsJson.push_back(pos.z);
+
+				const SVector3Df& rot = obj->WorldTranslation.GetRotation();
+				rotationsJson.push_back(rot.x);
+				rotationsJson.push_back(rot.y);
+				rotationsJson.push_back(rot.z);
+
+				const SVector3Df& scale = obj->WorldTranslation.GetScale();
+				scalesJson.push_back(scale.x);
+				scalesJson.push_back(scale.y);
+				scalesJson.push_back(scale.z);
+			}
 		}
 
 		// Assign the completed flat arrays to the instances object
@@ -402,7 +423,7 @@ bool CTerrainAreaData::CreateObject(const std::string& meshPath, const std::stri
 	newObjectData.WorldTranslation.SetRotation(rotation);
 	newObjectData.WorldTranslation.SetScale(scale);
 	newObjectData.boundingBox = pMesh->GetBoundingBox(); // Get the correct local-space box
-	newObjectData.eObjectType = OBJECT_TYPE_DYNAMIC; // Or whatever type is appropriate
+	newObjectData.eObjectType = OBJECT_TYPE_STATIC; // Or whatever type is appropriate
 
 	// Generate a new unique ID. A simple approach is to use the current size of the master list.
 	// A more robust system might use a static counter.

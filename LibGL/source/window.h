@@ -48,6 +48,8 @@ public:
 	void SetFrameBuffer(CFrameBuffer* pFBO);
 	CFrameBuffer* GetFrameBuffer();
 
+	CScreen* GetScreen() { return m_pScreen; }
+
 	void Update(GLfloat fDeltaTime = 0.0f);
 
 	static CTerrainManager* GetTerrainManager();

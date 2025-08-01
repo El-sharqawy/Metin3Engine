@@ -165,8 +165,7 @@ void CMesh::Render(GLuint uiNumInstances, const std::vector<CMatrix4Df>& matWorl
 			m_vMaterials[uiMaterialIndex].m_pSpecularMap->Bind(SPECULAR_EXPONENT_UNIT);
 		}
 
-		glDrawElementsInstancedBaseVertex(GL_TRIANGLES, m_vMeshes[i].uiNumIndices, GL_UNSIGNED_INT,
-			(void*)(sizeof(GLuint)* m_vMeshes[i].uiBaseIndex), iInstances, m_vMeshes[i].uiBaseVertex);
+		glDrawElementsInstancedBaseVertex(GL_TRIANGLES, m_vMeshes[i].uiNumIndices, GL_UNSIGNED_INT, (void*)(sizeof(GLuint)* m_vMeshes[i].uiBaseIndex), iInstances, m_vMeshes[i].uiBaseVertex);
 	}
 
 	// Make sure the VAO is not changed from the outside
@@ -372,7 +371,7 @@ void CMesh::InitSingleMesh(const aiMesh* pMesh)
 	const aiVector3D ZeroVec(0.0f, 0.0f, 0.0f);
 
 	// Populate the vertex attribute vectors
-	TVertex vertex{};
+	TMeshVertex vertex{};
 
 	for (GLuint i = 0; i < pMesh->mNumVertices; i++)
 	{
@@ -411,8 +410,8 @@ void CMesh::InitSingleMeshOptimized(GLuint uiMeshIndex, const aiMesh* pMesh)
 	const aiVector3D ZeroVec(0.0f, 0.0f, 0.0f);
 
 	// Populate the vertex attribute vectors
-	TVertex vertex{};
-	std::vector<TVertex> vecVertices(pMesh->mNumVertices);
+	TMeshVertex vertex{};
+	std::vector<TMeshVertex> vecVertices(pMesh->mNumVertices);
 
 	for (GLuint i = 0; i < pMesh->mNumVertices; i++)
 	{
@@ -474,7 +473,7 @@ void CMesh::PopulateBuffersDSA()
 	glNamedBufferStorage(m_uiBuffers[VERTEX_BUFFER], sizeof(m_vVertices[0]) * m_vVertices.size(), m_vVertices.data(), 0);
 	glNamedBufferStorage(m_uiBuffers[INDEX_BUFFER], sizeof(m_vIndices[0]) * m_vIndices.size(), m_vIndices.data(), 0);
 
-	glVertexArrayVertexBuffer(m_uiVAO, 0, m_uiBuffers[VERTEX_BUFFER], 0, sizeof(TVertex));
+	glVertexArrayVertexBuffer(m_uiVAO, 0, m_uiBuffers[VERTEX_BUFFER], 0, sizeof(TMeshVertex));
 	glVertexArrayElementBuffer(m_uiVAO, m_uiBuffers[INDEX_BUFFER]);
 
 	size_t sNumFloats = 0;
@@ -535,15 +534,15 @@ void CMesh::PopulateBuffersNonDSA()
 	size_t sNumFloats = 0;
 
 	glEnableVertexAttribArray(POSITION_LOCATION);
-	glVertexAttribPointer(POSITION_LOCATION, 3, GL_FLOAT, GL_FALSE, sizeof(TVertex), (const void*)(sNumFloats * sizeof(float)));
+	glVertexAttribPointer(POSITION_LOCATION, 3, GL_FLOAT, GL_FALSE, sizeof(TMeshVertex), (const void*)(sNumFloats * sizeof(float)));
 	sNumFloats += 3;
 
 	glEnableVertexAttribArray(NORMALS_LOCATION);
-	glVertexAttribPointer(NORMALS_LOCATION, 3, GL_FLOAT, GL_FALSE, sizeof(TVertex), (const void*)(sNumFloats * sizeof(float)));
+	glVertexAttribPointer(NORMALS_LOCATION, 3, GL_FLOAT, GL_FALSE, sizeof(TMeshVertex), (const void*)(sNumFloats * sizeof(float)));
 	sNumFloats += 3;
 
 	glEnableVertexAttribArray(TEX_COORDS_LOCATION);
-	glVertexAttribPointer(TEX_COORDS_LOCATION, 2, GL_FLOAT, GL_FALSE, sizeof(TVertex), (const void*)(sNumFloats * sizeof(float)));
+	glVertexAttribPointer(TEX_COORDS_LOCATION, 2, GL_FLOAT, GL_FALSE, sizeof(TMeshVertex), (const void*)(sNumFloats * sizeof(float)));
 
 	glBindBuffer(GL_ARRAY_BUFFER, m_uiBuffers[WVP_MAT_BUFFER]);
 
@@ -580,7 +579,7 @@ bool CMesh::InitFromScene(const aiScene* pScene, const std::string& stFileName)
 
 	if (!InitMaterials(pScene, stFileName))
 	{
-		sys_err("Failed to Initialize Materials");
+		sys_err("CMesh::InitFromScene: Failed to Initialize Materials");
 		return false;
 	}
 
@@ -621,7 +620,7 @@ void CMesh::InitAllMeshes(const aiScene* pScene)
 	}
 }
 
-void CMesh::OptimizeMesh(GLint iMeshIndex, std::vector<TVertex>& vVertices, std::vector<GLuint>& vIndices)
+void CMesh::OptimizeMesh(GLint iMeshIndex, std::vector<TMeshVertex>& vVertices, std::vector<GLuint>& vIndices)
 {
 	size_t NumVertices = vVertices.size();
 	size_t NumIndices = vIndices.size();
@@ -635,12 +634,12 @@ void CMesh::OptimizeMesh(GLint iMeshIndex, std::vector<TVertex>& vVertices, std:
 		NumIndices,		// and Indices size
 		vVertices.data(),	// Vertices Src
 		NumVertices,		// and Vertices size
-		sizeof(TVertex)		// stride
+		sizeof(TMeshVertex)		// stride
 		);
 
 	// Allocate a local index/vertex arrays
 	std::vector<GLuint> optimizedIndicesVec;
-	std::vector<TVertex> optimizedVerticesVec;
+	std::vector<TMeshVertex> optimizedVerticesVec;
 
 	// Resize it to our new Size
 	optimizedVerticesVec.resize(OptimizedVertexCount);
@@ -648,16 +647,16 @@ void CMesh::OptimizeMesh(GLint iMeshIndex, std::vector<TVertex>& vVertices, std:
 
 	// Optimization #1: remove duplicate vertices
 	meshopt_remapIndexBuffer(optimizedIndicesVec.data(), vIndices.data(), NumIndices, remapVec.data());
-	meshopt_remapVertexBuffer(optimizedVerticesVec.data(), vVertices.data(), NumVertices, sizeof(TVertex), remapVec.data());
+	meshopt_remapVertexBuffer(optimizedVerticesVec.data(), vVertices.data(), NumVertices, sizeof(TMeshVertex), remapVec.data());
 
 	// Optimization #2: improve the locality of the vertices
 	meshopt_optimizeVertexCache(optimizedIndicesVec.data(), optimizedIndicesVec.data(), NumIndices, OptimizedVertexCount);
 
 	// Optimization #3: reduce pixel overdraw
-	meshopt_optimizeOverdraw(optimizedIndicesVec.data(), optimizedIndicesVec.data(), NumIndices, &(optimizedVerticesVec[0].v3Pos.x), OptimizedVertexCount, sizeof(TVertex), 1.05f);
+	meshopt_optimizeOverdraw(optimizedIndicesVec.data(), optimizedIndicesVec.data(), NumIndices, &(optimizedVerticesVec[0].v3Pos.x), OptimizedVertexCount, sizeof(TMeshVertex), 1.05f);
 
 	// Optimization #4: optimize access to the vertex buffer
-	meshopt_optimizeVertexFetch(optimizedVerticesVec.data(), optimizedIndicesVec.data(), NumIndices, optimizedVerticesVec.data(), OptimizedVertexCount, sizeof(TVertex));
+	meshopt_optimizeVertexFetch(optimizedVerticesVec.data(), optimizedIndicesVec.data(), NumIndices, optimizedVerticesVec.data(), OptimizedVertexCount, sizeof(TMeshVertex));
 
 	// Optimization #5: create a simplified version of the model
 	float fThreshHold = 1.0f;
@@ -668,7 +667,7 @@ void CMesh::OptimizeMesh(GLint iMeshIndex, std::vector<TVertex>& vVertices, std:
 	std::vector<GLuint> SimplifiedIndiciesVec(optimizedIndicesVec.size());
 
 	size_t OptimizedIndicesCount = meshopt_simplify(SimplifiedIndiciesVec.data(), optimizedIndicesVec.data(), NumIndices,
-		&(optimizedVerticesVec[0].v3Pos.x), OptimizedVertexCount, sizeof(TVertex), TargetIndexCount, fTargetError);
+		&(optimizedVerticesVec[0].v3Pos.x), OptimizedVertexCount, sizeof(TMeshVertex), TargetIndexCount, fTargetError);
 
 	static GLint iNumIndices = 0;
 	iNumIndices += static_cast<GLint>(NumIndices);

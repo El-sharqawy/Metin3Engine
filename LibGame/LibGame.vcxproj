@@ -142,6 +142,7 @@
   <ItemGroup>
     <ClInclude Include="source\BoundingBox.h" />
     <ClInclude Include="source\Mesh.h" />
+    <ClInclude Include="source\MeshManager.h" />
     <ClInclude Include="source\Model.h" />
     <ClInclude Include="source\PhysicsObject.h" />
     <ClInclude Include="source\PhysicsWorld.h" />
@@ -153,6 +154,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="source\Mesh.cpp" />
+    <ClCompile Include="source\MeshManager.cpp" />
     <ClCompile Include="source\Model.cpp" />
     <ClCompile Include="source\PhysicsObject.cpp" />
     <ClCompile Include="source\PhysicsWorld.cpp" />

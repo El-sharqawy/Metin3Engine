@@ -11,6 +11,7 @@
 #include "../../LibGame/source/SkyBox.h"
 #include "../../LibTerrain/source/TerrainAreaData.h"
 #include "../../LibGame/source/Mesh.h"
+#include "../../LibGame/source/PhysicsObject.h"
 
 static CWindow* appWnd = nullptr;
 GLuint CWindow::m_uiRandSeed = 0;
@@ -229,9 +230,14 @@ void CWindow::mouse_button_callback(GLFWwindow* window, int button, int action, 
 	{
 		if (action == GLFW_PRESS || action == GLFW_REPEAT)
 		{
-			//CTerrainManager::Instance().ApplyTerrainHeightBrush();
-			//CTerrainManager::Instance().PaintBrushOnSinglePatch();
-			appWnd->m_pTerrainManager->UpdateEditing();
+			if (appWnd->m_pTerrainManager->IsEditingTerrain())
+			{
+				appWnd->m_pTerrainManager->UpdateEditing();
+			}
+			else if (appWnd->m_pTerrainManager->IsPickingObjects())
+			{
+				appWnd->m_pTerrainManager->PickObject(appWnd->m_pScreen->GetCRay());
+			}
 		}
 	}
 }
@@ -242,8 +248,6 @@ void CWindow::mouse_callback(GLFWwindow* window, double xpos, double ypos)
 	{
 		appWnd->GetCamera()->ProcessMouseMovement(static_cast<float>(xpos), static_cast<float>(ypos));
 	}
-
-
 }
 
 void CWindow::scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
@@ -491,7 +495,7 @@ void CWindow::Update(GLfloat fDeltaTime)
 	glfwGetCursorPos(GetWindow(), &mouseX, &mouseY);
 	glfwGetWindowSize(GetWindow(), &winW, &winH);
 
-	m_pScreen->SetCursorPosition((GLint)mouseX, (GLint)mouseY, winW, winH);
+	m_pScreen->SetCursorPosition(static_cast<GLint>(mouseX), static_cast<GLint>(mouseY), winW, winH);
 	m_pTerrainManager->UpdateEditingPoint(&m_pScreen->GetIntersectionPoint());
 
 	m_pSkyBox->Update();
@@ -526,8 +530,12 @@ void CWindow::Update(GLfloat fDeltaTime)
 	glDisable(GL_BLEND); // Disable blending to avoid transparency issues
 
 	CShader* pScreenShader = m_pScreenSpaceShader->GetShaderPtr();
+
+	GLfloat fWidth = static_cast<GLfloat>(GetWidth());
+	GLfloat fHeight = static_cast<GLfloat>(GetHeight());
+
 	pScreenShader->Use();
-	pScreenShader->setVec2("resolution", GetWidth(), GetHeight());
+	pScreenShader->setVec2("resolution", fWidth, fHeight);
 	pScreenShader->setSampler2D("screenTexture", m_pFrameBufObj->GetTextureID(), 0);
 	pScreenShader->setSampler2D("depthTex", m_pFrameBufObj->GetDepthTextureID(), 1);
 	m_pScreenSpaceShader->Render();

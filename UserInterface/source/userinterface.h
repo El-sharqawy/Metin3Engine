@@ -26,6 +26,7 @@ public:
 
 	void RenderTerrainUI();
 	void RenderSkyBoxUI();
+	void RenderPlacingObjectsUI();
 
 #if defined(ENABLE_DISCORD_RPC)
 	void Discord_Start();

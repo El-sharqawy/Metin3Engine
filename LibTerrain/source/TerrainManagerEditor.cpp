@@ -1,6 +1,7 @@
 #include "Stdafx.h"
 #include "TerrainManager.h"
 #include "TerrainMap.h"
+#include "../../LibGame/source/PhysicsObject.h"
 
 void CTerrainManager::ClearEditor()
 {
@@ -20,7 +21,7 @@ void CTerrainManager::ClearEditor()
 
 	m_v3PickingPoint = SVector3Df(0.0f);
 
-	m_bIsEditing = true;
+	m_bIsEditingTerrain = true;
 	m_bIsEditingHeight = false;
 	m_bIsEditingTexture = false;
 	m_bIsEditingAttribute = false;
@@ -33,9 +34,13 @@ void CTerrainManager::ClearEditor()
 	m_fWaterBrushHeight = 0.0f;
 	m_iSelectedTextureIndex = 1;
 
+	m_bIsPickingObjects = false;
+	m_pCurrentPickedObject = nullptr;
+
 	m_iNewMapSizeX = 0;
 	m_iNewMapSizeZ = 0;
 	m_strNewMapName.clear();
+
 }
 
 bool CTerrainManager::CreateNewMap()
@@ -166,7 +171,7 @@ void CTerrainManager::UpdateEditingPoint(SVector3Df* v3IntersectionPoint)
 void CTerrainManager::UpdateEditing()
 {
 	// Editing is ON
-	if (m_bIsEditing)
+	if (m_bIsEditingTerrain)
 	{
 		if (m_bIsEditingHeight)
 		{
@@ -316,14 +321,14 @@ void CTerrainManager::SetBrushMaxSize(GLint iBrushMaxSize)
 	m_pTerrainMap->SetBrushMaxSize(iBrushMaxSize);
 }
 
-bool CTerrainManager::IsEditing() const
+bool CTerrainManager::IsEditingTerrain() const
 {
-	return (m_bIsEditing);
+	return (m_bIsEditingTerrain);
 }
 
-void CTerrainManager::SetEditing(bool bEdit)
+void CTerrainManager::SetEditingTerrain(bool bEdit)
 {
-	m_bIsEditing = bEdit;
+	m_bIsEditingTerrain = bEdit;
 }
 
 bool CTerrainManager::IsEditingHeight() const
@@ -502,4 +507,58 @@ void CTerrainManager::SelectedTextureIndex(GLint iSelectedTextureIndex)
 		iSelectedTextureIndex = 0;
 	}
 	m_iSelectedTextureIndex = iSelectedTextureIndex;
+}
+
+bool CTerrainManager::IsPickingObjects() const
+{
+	return (m_bIsPickingObjects);
+}
+
+void CTerrainManager::SetPickingObjects(bool bIsPicking)
+{
+	m_bIsPickingObjects = bIsPicking;
+
+	if (bIsPicking)
+	{
+		sys_log("Object picking mode enabled");
+	}
+	else
+	{
+		sys_log("Object picking mode disabled");
+	}
+
+	if (m_pCurrentPickedObject)
+	{
+		m_pCurrentPickedObject->SetSelectedObject(false);
+		m_pCurrentPickedObject = nullptr;
+	}
+}
+
+void CTerrainManager::PickObject(const CRay& ray)
+{
+	CPhysicsObject* pPickedObject = CPhysicsWorld::Instance().PickObject(ray);
+	if (pPickedObject != m_pCurrentPickedObject)
+	{
+		// Unselect previous
+		if (m_pCurrentPickedObject)
+			m_pCurrentPickedObject->SetSelectedObject(false);
+
+		// Select new one
+		if (pPickedObject)
+		{
+			pPickedObject->SetSelectedObject(true);
+			sys_log("Picked object: %f, %f, %f", pPickedObject->GetPosition().x, pPickedObject->GetPosition().y, pPickedObject->GetPosition().z);
+		}
+		else
+		{
+			sys_log("No object picked");
+		}
+
+		m_pCurrentPickedObject = pPickedObject;
+	}
+}
+
+CPhysicsObject* CTerrainManager::GetCurrentPickedObject() const
+{
+	return (m_pCurrentPickedObject);
 }

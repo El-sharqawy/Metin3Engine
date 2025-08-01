@@ -45,6 +45,9 @@
     <ClInclude Include="source\SpatialGrid.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="source\MeshManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="source\Stdafx.cpp">
@@ -72,6 +75,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="source\PhysicsWorld.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="source\MeshManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

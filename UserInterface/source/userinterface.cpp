@@ -6,6 +6,7 @@
 #include "../../LibTerrain/source/Terrain.h"
 #include "../../LibTerrain/source/TerrainMap.h"
 #include "../../LibGame/source/SkyBox.h"
+#include "../../LibGame/source/PhysicsObject.h"
 
 #if defined(_WIN64)
 #undef min
@@ -254,7 +255,7 @@ void CUserInterface::RenderTerrainUI()
 		return;
 	}
 
-	static bool bIsEditing = pTerrainManager->IsEditing();
+	static bool bIsEditing = pTerrainManager->IsEditingTerrain();
 	static bool bIsEditingHeight = pTerrainManager->IsEditingHeight();
 	static bool bIsEditingTextures = pTerrainManager->IsEditingTexture();
 	static bool bIsEditingAttribute = pTerrainManager->IsEditingAttribute();
@@ -264,7 +265,7 @@ void CUserInterface::RenderTerrainUI()
 
 	if (ImGui::Checkbox("Terrain Editing", &bIsEditing))
 	{
-		pTerrainManager->SetEditing(bIsEditing);
+		pTerrainManager->SetEditingTerrain(bIsEditing);
 	}
 
 	ImGui::Separator();
@@ -604,6 +605,35 @@ void CUserInterface::RenderSkyBoxUI()
 {
 	CSkyBox::Instance().SetGUI();
 }
+void CUserInterface::RenderPlacingObjectsUI()
+{
+	static CTerrainManager* pTerrainManager = m_pWindow->GetTerrainManager();
+
+	if (pTerrainManager->IsMapReady() == false)
+	{
+		ImGui::TextColored(ImVec4(1, 0, 0, 1), "You need to Load Map First.");
+		return;
+	}
+
+	static bool bIsPickingObj = pTerrainManager->IsPickingObjects();
+
+	ImVec2 buttonSize(125, 25);
+
+	if (ImGui::Checkbox("Terrain Picking", &bIsPickingObj))
+	{
+		pTerrainManager->SetPickingObjects(bIsPickingObj);
+		pTerrainManager->SetEditingTerrain(!bIsPickingObj); // Disable terrain editing when picking objects
+	}
+
+	ImGui::Separator();
+	if (bIsPickingObj)
+	{
+		if (pTerrainManager->GetCurrentPickedObject())
+		{
+			ImGui::InputFloat3("Object Position", (float*)&pTerrainManager->GetCurrentPickedObject()->GetPosition()[0]);
+		}
+	}
+}
 void CUserInterface::Render()
 {
 	ImGui::Begin("Terrain Tools");
@@ -618,6 +648,12 @@ void CUserInterface::Render()
 		if (ImGui::BeginTabItem("Terrain"))
 		{
 			RenderTerrainUI();
+			ImGui::EndTabItem();
+		}
+
+		if (ImGui::BeginTabItem("Objects"))
+		{
+			//RenderPlacingObjectsUI();
 			ImGui::EndTabItem();
 		}
 

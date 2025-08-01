@@ -5,6 +5,7 @@
 #include <set>
 
 class CPhysicsObject;
+class CRay;
 
 class CSpatialGrid
 {
@@ -17,6 +18,13 @@ public:
 
 	// The Most Important Function: Get Objects in a Cell
 	std::vector<std::pair<CPhysicsObject*, CPhysicsObject*>> GetPotentialCollisions();
+
+	/**
+	 * @brief Gets all unique objects from cells that a ray passes through.
+	 * @param ray The world-space ray to test against the grid.
+	 * @return A vector of potential objects to perform precise intersection tests on.
+	 */
+	std::vector<CPhysicsObject*> GetObjectsAlongRay(const CRay& ray);
 
 private:
 	GLfloat m_fCellSize;

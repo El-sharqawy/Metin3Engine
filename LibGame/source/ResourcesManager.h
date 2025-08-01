@@ -25,6 +25,10 @@ public:
     CResourcesManager() = default;
     ~CResourcesManager() = default;
 
+    // Prevents copying and assignment
+    CResourcesManager(const CResourcesManager&) = delete;
+    CResourcesManager& operator=(const CResourcesManager&) = delete;
+
     // Gets a pointer to a mesh.
     // It loads the mesh from the file path if it's not already in memory.
     CMesh* GetMesh(const std::string& stMeshPath);

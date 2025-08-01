@@ -36,7 +36,7 @@
                 ],
                 "types": [
                     2,
-                    2
+                    1
                 ]
             },
             "mesh": "resources/models/test1.obj",

@@ -7,6 +7,13 @@
 #include "../../LibMath/source/ray.h"
 
 class CTerrainManager;
+struct SBoundingBox;
+
+typedef struct SScreenVertex
+{
+	SVector3Df v3Pos;
+	SVector4Df v4Color;
+} TScreenVertex;
 
 class CScreen
 {
@@ -24,6 +31,8 @@ public:
 	void RenderCircle3d(float fx, float fy, float fz, float fRadius, int iStep);
 
 	void RenderLinedBox3d(float sx, float sy, float sz, float ex, float ey, float ez);
+	void RenderLinedBox3d(const SBoundingBox& boundingBox);
+
 	void RenderLinedSquare3d(float sx, float sy, float sz, float ex, float ey, float ez);
 
 	void RenderBox3d(float sx, float sy, float sz, float ex, float ey, float ez);
@@ -65,12 +74,6 @@ public:
 	}
  
 protected:
-	typedef struct SScreenVertex
-	{
-		SVector3Df v3Pos;
-		SVector4Df v4Color;
-	} TScreenVertex;
-
 	void UpdateVertexBuffer(const TScreenVertex* vertices, size_t vertexCount);
 
 private:

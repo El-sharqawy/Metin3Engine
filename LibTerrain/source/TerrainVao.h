@@ -1,6 +1,7 @@
 #pragma once
 
 #include "TerrainData.h"
+#include "../../LibGL/source/Utils.h"
 
 class CTerrainVAO final
 {

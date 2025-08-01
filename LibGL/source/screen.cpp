@@ -314,6 +314,14 @@ void CScreen::RenderLinedBox3d(float sx, float sy, float sz, float ex, float ey,
 	glBindVertexArray(0);
 }
 
+void CScreen::RenderLinedBox3d(const SBoundingBox& boundingBox)
+{
+	RenderLinedBox3d(
+		boundingBox.v3Min.x, boundingBox.v3Min.y, boundingBox.v3Min.z,
+		boundingBox.v3Max.x, boundingBox.v3Max.y, boundingBox.v3Max.z
+	);
+}
+
 void CScreen::RenderLinedSquare3d(float sx, float sy, float sz, float ex, float ey, float ez)
 {
 	if (m_iVAO == 0)
@@ -657,7 +665,7 @@ void CScreen::Update()
 		ms_v3IntersectionPoint.x, ms_v3IntersectionPoint.y - fCellScale, ms_v3IntersectionPoint.z,
 		ms_v3IntersectionPoint.x, ms_v3IntersectionPoint.y + fCellScale, ms_v3IntersectionPoint.z);
 
-	if (m_pTerrainManager->IsEditing())
+	if (m_pTerrainManager->IsEditingTerrain())
 	{
 		if (m_pTerrainManager->IsEditingHeight() || m_pTerrainManager->IsEditingTexture() || m_pTerrainManager->IsEditingAttribute())
 		{

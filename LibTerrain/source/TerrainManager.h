@@ -4,6 +4,8 @@
 #include <string>
 
 class CTerrainMap;
+class CPhysicsObject;
+class CRay;
 
 /**
  * CTerrainManager - A Manager Class for The Whole Terrain System
@@ -79,8 +81,8 @@ public:
 	GLint GetBrushMaxSize() const;
 	void SetBrushMaxSize(GLint iBrushMaxSize);
 
-	bool IsEditing() const;
-	void SetEditing(bool bEdit);
+	bool IsEditingTerrain() const;
+	void SetEditingTerrain(bool bEdit);
 
 	bool IsEditingHeight() const;
 	void SetEditingHeight(bool bEdit);
@@ -111,6 +113,12 @@ public:
 	void ReloadTerrainTextures();
 	void SelectedTextureIndex(GLint iSelectedTextureIndex);
 
+	// Pick Object
+	bool IsPickingObjects() const;
+	void SetPickingObjects(bool bIsPicking);
+	void PickObject(const CRay& ray);
+	CPhysicsObject* GetCurrentPickedObject() const;
+
 protected:
 	/*** Editor Variables ***/
 	// Map Vars
@@ -135,7 +143,7 @@ protected:
 	GLint m_iEditTerrainNumZ;
 	SVector3Df m_v3PickingPoint;
 
-	bool m_bIsEditing;
+	bool m_bIsEditingTerrain;
 	bool m_bIsEditingHeight;
 	bool m_bIsEditingTexture;
 	bool m_bIsEditingAttribute;
@@ -148,4 +156,8 @@ protected:
 	bool m_bEraseWater;
 
 	GLint m_iSelectedTextureIndex;
+
+	// Object Picker
+	bool m_bIsPickingObjects;
+	CPhysicsObject* m_pCurrentPickedObject;
 };

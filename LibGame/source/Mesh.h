@@ -48,21 +48,21 @@
 
 class CPhysicsObject;
 
-typedef struct SVertex
+typedef struct SMeshVertex
 {
 	SVector3Df v3Pos;
 	SVector3Df v3Normals;
 	SVector2Df v2Texture;
 
-	SVertex() = default;
+	SMeshVertex() = default;
 
-	SVertex(const SVector3Df& vPos, const SVector3Df& vNormals, const SVector2Df& vTexture)
+	SMeshVertex(const SVector3Df& vPos, const SVector3Df& vNormals, const SVector2Df& vTexture)
 	{
 		v3Pos = vPos;
 		v3Normals = vNormals;
 		v2Texture = vTexture;
 	}
-} TVertex;
+} TMeshVertex;
 
 typedef struct SPBRMaterial
 {
@@ -145,6 +145,7 @@ public:
 
 	const TMaterial& GetMaterial();
 	TPBRMaterial& GetPBRMaterial();
+
 	void GetLeadingVertex(GLuint uiDrawIndex, GLuint uiPrimID, SVector3Df& Vertex);
 	void SetPBR(bool bIsPBR);
 	bool IsPBR() const;
@@ -221,7 +222,7 @@ private:
 	bool InitFromScene(const aiScene* pScene, const std::string& stFileName);
 	void ConvertVerticesAndIndices(const aiScene* pScene, GLuint& uiNumVertices, GLuint& uiNumIndices);
 	void InitAllMeshes(const aiScene* pScene);
-	void OptimizeMesh(GLint iMeshIndex, std::vector<TVertex>& vVertices, std::vector<GLuint>& vIndices);
+	void OptimizeMesh(GLint iMeshIndex, std::vector<TMeshVertex>& vVertices, std::vector<GLuint>& vIndices);
 	bool InitMaterials(const aiScene* pScene, const std::string& stFileName);
 	void LoadTextures(const std::string& stDirectory, const aiMaterial* pMaterial, GLint iMaterialIndex);
 
@@ -254,7 +255,7 @@ private:
 	std::vector<TMaterial> m_vMaterials;
 
 	// Temporary space for vertex stuff before we load them into the GPU
-	std::vector<TVertex> m_vVertices;
+	std::vector<TMeshVertex> m_vVertices;
 
 	Assimp::Importer m_Importer;
 	bool m_bIsPBR;
