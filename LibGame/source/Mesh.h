@@ -11,20 +11,7 @@
 
 #include "../../UserInterface/source/CommonDefines.h"
 #include "BoundingBox.h"
-
-#define INVALID_MATERIAL 0xFFFFFFFF
-#define ASSIMP_LOAD_FLAGS_UV_FLIP (aiProcess_JoinIdenticalVertices |    \
-                           aiProcess_Triangulate |              \
-                           aiProcess_GenSmoothNormals |         \
-                           aiProcess_LimitBoneWeights |         \
-                           aiProcess_SplitLargeMeshes |         \
-                           aiProcess_ImproveCacheLocality |     \
-                           aiProcess_RemoveRedundantMaterials | \
-                           aiProcess_FindDegenerates |          \
-                           aiProcess_FindInvalidData |          \
-                           aiProcess_GenUVCoords |              \
-						   aiProcess_FlipUVs |					\
-                           aiProcess_CalcTangentSpace)
+#include "MeshData.h"
 
 #define ASSIMP_LOAD_FLAGS (aiProcess_JoinIdenticalVertices |    \
                            aiProcess_Triangulate |              \
@@ -48,90 +35,6 @@
 
 class CPhysicsObject;
 
-typedef struct SMeshVertex
-{
-	SVector3Df v3Pos;
-	SVector3Df v3Normals;
-	SVector2Df v2Texture;
-
-	SMeshVertex() = default;
-
-	SMeshVertex(const SVector3Df& vPos, const SVector3Df& vNormals, const SVector2Df& vTexture)
-	{
-		v3Pos = vPos;
-		v3Normals = vNormals;
-		v2Texture = vTexture;
-	}
-} TMeshVertex;
-
-typedef struct SPBRMaterial
-{
-	float m_fRoughness;
-	bool m_bIsMetal;
-	SVector3Df m_v3Color;
-	CTexture* m_pAlbedo;
-	CTexture* m_pRoughness;
-	CTexture* m_pMetallic;
-	CTexture* m_pNormalMap;
-
-	SPBRMaterial()
-	{
-		m_fRoughness = 0.0f;
-		m_bIsMetal = false;
-		m_v3Color = SVector3Df(0.0f, 0.0f, 0.0f);
-		m_pAlbedo = nullptr;
-		m_pRoughness = nullptr;
-		m_pMetallic = nullptr;
-		m_pNormalMap = nullptr;
-	}
-
-} TPBRMaterial;
-
-typedef struct SMaterial
-{
-	std::string m_stName;
-	TPBRMaterial m_sPBRMaterial;
-
-	SVector4Df m_v4AmbientColor;
-	SVector4Df m_v4DiffuseColor;
-	SVector4Df m_v4SpecularColor;
-
-	CTexture* m_pDiffuseMap;
-	CTexture* m_pSpecularMap;
-
-	float m_fTransparency;
-	float m_fAlpha;
-
-	SMaterial()
-	{
-		m_stName = "Material";
-		m_sPBRMaterial = {};
-		m_v4AmbientColor = SVector4Df(0.0f, 0.0f, 0.0f, 0.0f);
-		m_v4DiffuseColor = SVector4Df(0.0f, 0.0f, 0.0f, 0.0f);
-		m_v4SpecularColor = SVector4Df(0.0f, 0.0f, 0.0f, 0.0f);
-
-		m_pDiffuseMap = nullptr;
-		m_pSpecularMap = nullptr;
-
-		m_fTransparency = 1.0f;
-		m_fAlpha = 0.0f;
-	}
-
-	~SMaterial()
-	{
-		if (m_pDiffuseMap)
-		{
-			delete m_pDiffuseMap;
-		}
-
-		if (m_pSpecularMap)
-		{
-			delete m_pSpecularMap;
-		}
-	}
-
-} TMaterial;
-
 class CMesh
 {
 public:
@@ -139,6 +42,7 @@ public:
 	~CMesh();
 
 	bool LoadMesh(const std::string& stFileName, bool bIsUVFlipped = false);
+	void Render(GLuint uiVAO);
 	void Render();
 	void Render(GLuint uiDrawIndex, GLuint uiPrimID);
 	void Render(GLuint uiNumInstances, const std::vector<CMatrix4Df>& matWorld, const std::vector<CMatrix4Df>& matWVP);
@@ -172,42 +76,32 @@ public:
 	void ComputeBoundingVolumes();
 
 	TBoundingBox& GetBoundingBox();
-	std::string GetMeshName() const { return m_sMeshName; }
-	void SetMeshName(const std::string& stName) { m_sMeshName = stName; }
+	std::string GetMeshName() const { return m_stMeshName; }
+	void SetMeshName(const std::string& stName) { m_stMeshName = stName; }
+
+	std::string GetMeshFilePath() const { return m_stMeshFilePath; }
+	void SetMeshFilePath(const std::string& stFilePath) { m_stMeshFilePath = stFilePath; }
+
+	const std::vector<TMeshVertex>& GetVertices() const { return m_vVertices; }
+	const std::vector<GLuint>& GetIndices() const { return m_vIndices; }
+	const std::vector<TMeshEntry>& GetMeshes() const { return m_vMeshes; }
+	const std::vector<TMeshEntry>& GetMeshEntries() const { return m_vMeshes; }
+	const std::vector<TMaterial>& GetMaterials() const { return m_vMaterials; }
+
+	void SetIndexOffset(size_t iOffset) { m_iIndexOffset = iOffset; }
+	void SetVertexOffset(size_t iOffset) { m_iVertexOffset = iOffset; }
+	void SetIndexCount(size_t iCount) { m_iIndexCount = iCount; }
+	void SetVertexCount(size_t iCount) { m_iVertexCount = iCount; }
+
+	void PopulateBuffers(GLuint uiVAO);
 
 protected:
 	void Clear();
-	virtual void ReserveSpace(GLuint uiNumVertices, GLuint uiNumIndices);
-	virtual void InitSingleMesh(const aiMesh* pMesh);
-	virtual void InitSingleMeshOptimized(GLuint uiMeshIndex, const aiMesh* pMesh);
-	virtual void PopulateBuffers();
-	virtual void PopulateBuffersDSA();
-	virtual void PopulateBuffersNonDSA();
-
-	typedef struct SMeshEntry
-	{
-		SMeshEntry()
-		{
-			uiBaseVertex = 0;
-			uiBaseIndex = 0;
-			uiNumIndices = 0;
-			uiMaterialIndex = INVALID_MATERIAL;
-		}
-
-		GLuint uiBaseVertex;
-		GLuint uiBaseIndex;
-		GLuint uiNumIndices;
-		GLuint uiMaterialIndex;
-	} TMeshEntry;
-
-	enum EBufferType
-	{
-		INDEX_BUFFER,
-		VERTEX_BUFFER,
-		WVP_MAT_BUFFER = 2,  // required only for instancing
-		WORLD_MAT_BUFFER = 3,  // required only for instancing
-		NUM_BUFFERS = 4
-	};
+	void ReserveSpace(GLuint uiNumVertices, GLuint uiNumIndices);
+	void InitSingleMesh(const aiMesh* pMesh);
+	void InitSingleMeshOptimized(GLuint uiMeshIndex, const aiMesh* pMesh);
+	void PopulateBuffersDSA(GLuint uiVAO);
+	void PopulateBuffersNonDSA(GLuint uiVAO);
 
 	std::vector<TMeshEntry> m_vMeshes;
 	std::vector<GLuint> m_vIndices;
@@ -216,9 +110,9 @@ protected:
 	CMatrix4Df m_matGlobalInverseTransform;
 
 	GLuint m_uiVAO;
-	GLuint m_uiBuffers[NUM_BUFFERS];
+	GLuint m_uiBuffers[BUFFERS_MAX_NUM];
 
-private:
+public:
 	bool InitFromScene(const aiScene* pScene, const std::string& stFileName);
 	void ConvertVerticesAndIndices(const aiScene* pScene, GLuint& uiNumVertices, GLuint& uiNumIndices);
 	void InitAllMeshes(const aiScene* pScene);
@@ -252,6 +146,7 @@ private:
 
 	void ResizeInstanceBuffers(GLuint newMaxInstances);
 
+private:
 	std::vector<TMaterial> m_vMaterials;
 
 	// Temporary space for vertex stuff before we load them into the GPU
@@ -268,5 +163,11 @@ private:
 	CPhysicsObject* m_pPhysicsObject;
 	bool m_bNeedsUpdate;
 	GLuint m_uiMaxInstances; // current buffer capacity
-	std::string m_sMeshName;
+	std::string m_stMeshFilePath;
+	std::string m_stMeshName;
+
+	size_t m_iIndexCount; // Number of indices in the mesh
+	size_t m_iVertexCount; // Number of vertices in the mesh
+	size_t m_iIndexOffset; // Offset for instancing
+	size_t m_iVertexOffset; // Offset for instancing
 };

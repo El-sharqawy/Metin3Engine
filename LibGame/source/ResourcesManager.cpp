@@ -1,46 +1,7 @@
 #include "Stdafx.h"
 #include "ResourcesManager.h"
-#include "Mesh.h"
 #include "../../LibGL/source/Shader.h"
 #include <nlohmann/json.hpp> // Requires JSON for Modern C++ library
-
-
-CMesh* CResourcesManager::GetMesh(const std::string& stMeshPath)
-{
-	// 1. Check if the mesh is already loaded by searching for its path in the map.
-	std::map<std::string, std::unique_ptr<CMesh>>::iterator it = m_mMeshes.find(stMeshPath);
-	if (it != m_mMeshes.end())
-	{
-		// Found it! Return the existing pointer.
-		return it->second.get();
-	}
-
-	// 2. If not found, we need to load it from disk.
-	sys_log("CResourcesManager::GetMesh: Loading new mesh from %s", stMeshPath.c_str());
-
-	// Create a new CMesh object managed by a unique_ptr.
-	std::unique_ptr<CMesh> newMesh = std::make_unique<CMesh>();
-
-	// Assume your CMesh class has a Load function that returns true on success.
-	if (newMesh->LoadMesh(stMeshPath))
-	{
-		// 3. If loading was successful, get the raw pointer to return.
-		CMesh* pMesh = newMesh.get();
-
-		// 4. Move the unique_ptr into the map. The map now owns the mesh.
-		m_mMeshes[stMeshPath] = std::move(newMesh);
-
-		return (pMesh);
-	}
-	else
-	{
-		// Loading failed.
-		sys_err("CResourcesManager::GetMesh: Failed to load mesh from %s", stMeshPath.c_str());
-		return (nullptr);
-	}
-
-	return (nullptr);
-}
 
 CShader* CResourcesManager::GetShader(const std::string& stShaderName)
 {

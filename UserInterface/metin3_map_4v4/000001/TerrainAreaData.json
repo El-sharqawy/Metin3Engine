@@ -51,7 +51,7 @@
                 ]
             },
             "mesh": "resources/models/test1.obj",
-            "name": "resources/models/test1.obj",
+            "name": "warrior_mesh",
             "shader": "StandardInstancedModel"
         }
     ]

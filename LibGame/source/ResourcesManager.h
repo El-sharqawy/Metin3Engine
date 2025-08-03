@@ -29,10 +29,6 @@ public:
     CResourcesManager(const CResourcesManager&) = delete;
     CResourcesManager& operator=(const CResourcesManager&) = delete;
 
-    // Gets a pointer to a mesh.
-    // It loads the mesh from the file path if it's not already in memory.
-    CMesh* GetMesh(const std::string& stMeshPath);
-
     // Gets a pointer to a shader.
     // If "model_shader" is requested, this class knows how to find and load
     // "shaders/model_shader.vert" and "shaders/model_shader.frag".
@@ -47,5 +43,4 @@ private:
     std::map<std::string, SShaderProgramDefinitions> m_mShaderDefinitions;
 
     std::map<std::string, std::unique_ptr<CShader>> m_mShaders;
-    std::map<std::string, std::unique_ptr<CMesh>> m_mMeshes;
 };

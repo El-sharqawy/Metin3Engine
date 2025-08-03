@@ -8,6 +8,7 @@
 #include "../../LibGame/source/Mesh.h"
 #include "../../LibGame/source/PhysicsObject.h"
 #include "../../LibGame/source/BoundingBox.h"
+#include "../../LibGame/source/MeshManager.h"
 
 #ifdef _DEBUG
 #include <crtdbg.h>
@@ -37,14 +38,6 @@ int main()
 
 	float deltaTime = 0.0f; // Time between current frame and last frame
 	float lastFrame = 0.0f; // Time of last frame
-
-	glEnable(GL_DEPTH_TEST);
-
-	glFrontFace(GL_CW);
-	glCullFace(GL_BACK);
-	glEnable(GL_CULL_FACE);
-	glEnable(GL_MULTISAMPLE);
-	glEnable(GL_DEBUG_OUTPUT);
 
 	while (app->WindowLoop())
 	{

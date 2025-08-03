@@ -1,6 +1,7 @@
 #include "Stdafx.h"
 #include "TerrainAreaData.h"
 #include "../../LibGame/source/PhysicsObject.h"
+#include "../../LibGame/source/MeshManager.h"
 
 CTerrainAreaData::CTerrainAreaData()
 {
@@ -155,8 +156,8 @@ void CTerrainAreaData::RenderAreaObjects(GLfloat fDeltaTime)
 			}
 
 			// Add the known-good matrices to the render list.
-			visibleWorldMatrices.push_back(worldMatrix);
-			visibleWvpMatrices.push_back(WVP * worldMatrix);
+			visibleWvpMatrices.push_back(worldMatrix);
+			visibleWorldMatrices.push_back(WVP * worldMatrix);
 		}
 
 		// IMPORTANT: Only render if there are any visible objects in this group
@@ -165,7 +166,8 @@ void CTerrainAreaData::RenderAreaObjects(GLfloat fDeltaTime)
 			group.pShader->Use();
 			//group.pMesh->Update(fDeltaTime);
 			// Pass the temporary vectors of VISIBLE objects to the render function
-			group.pMesh->Render(group.GetInstanceCount(), visibleWvpMatrices, visibleWorldMatrices);
+			//group.pMesh->Render(group.GetInstanceCount(), visibleWvpMatrices, visibleWorldMatrices);
+			CMeshManager::Instance().RenderMeshInstanced(group.pMesh->GetMeshName(), group.GetInstanceCount(), visibleWorldMatrices, visibleWvpMatrices);
 
 			for (auto& objectData : group.vecObjects)
 			{
@@ -177,7 +179,6 @@ void CTerrainAreaData::RenderAreaObjects(GLfloat fDeltaTime)
 					SBoundingBox worldBox = objectData->pPhysicsObject->GetBoundingBoxWorld();
 
 					// 4. Draw the correctly transformed box
-					//AABB.Draw(worldBox.v3Min, worldBox.v3Max);
 					worldBox.Draw(objectData->pPhysicsObject->IsSelectedObject());
 				}
 			}
@@ -211,15 +212,15 @@ bool CTerrainAreaData::LoadAreaObjectsFromFile(const std::string& stAreaObjectsD
 		for (const auto& groupJson : renderGroupsJson)
 		{
 			// 3a. Get Resources from the Resource Manager
-			std::string meshPath = groupJson["mesh"];
+			std::string meshName = groupJson["name"];
 			std::string shaderName = groupJson["shader"];
 
-			CMesh* pMesh = CResourcesManager::Instance().GetMesh(meshPath);
+			std::shared_ptr<CMesh> pMesh = CMeshManager::Instance().GetMesh(meshName);
 			CShader* pShader = CResourcesManager::Instance().GetShader(shaderName);
 
 			if (!pMesh || !pShader)
 			{
-				sys_err("LoadAreaObjectsFromFile: Failed to get mesh '%s' or shader '%s'. Skipping group.", meshPath.c_str(), shaderName.c_str());
+				sys_err("LoadAreaObjectsFromFile: Failed to get mesh '%s' or shader '%s'. Skipping group.", meshName.c_str(), shaderName.c_str());
 				continue;
 			}
 
@@ -271,7 +272,7 @@ bool CTerrainAreaData::LoadAreaObjectsFromFile(const std::string& stAreaObjectsD
 
 				// Use your existing AddObject function to correctly place the new object
 				// in both the master list and the correct render group.
-				AddObjectInstanceGroup(pShader, pMesh, newObjectData);
+				AddObjectInstanceGroup(pShader, pMesh.get(), newObjectData);
 			}
 		}
 	}
@@ -306,7 +307,7 @@ bool CTerrainAreaData::SaveAreaObjectsFromFile(const std::string& stMapName)
 	{
 		nlohmann::json groupJson;
 		groupJson["name"] = group.pMesh ? group.pMesh->GetMeshName() : "Unnamed Group"; // Give it a debug name
-		groupJson["mesh"] = group.pMesh ? group.pMesh->GetMeshName() : "";
+		groupJson["mesh"] = group.pMesh ? group.pMesh->GetMeshFilePath() : "";
 		groupJson["shader"] = group.pShader ? group.pShader->GetName() : "";
 
 		// --- Create the main "instances" object ---
@@ -405,15 +406,15 @@ std::vector<TObjectInstanceGroup>& CTerrainAreaData::GetObjectsGroups()
 	return (m_vObjectsGroups);
 }
 
-bool CTerrainAreaData::CreateObject(const std::string& meshPath, const std::string& shaderName, const SVector3Df& position, const SVector3Df& rotation, const SVector3Df& scale)
+bool CTerrainAreaData::CreateObject(const std::string& meshName, const std::string& shaderName, const SVector3Df& position, const SVector3Df& rotation, const SVector3Df& scale)
 {
 	// 1. Get the required resources from the manager.
-	CMesh* pMesh = CResourcesManager::Instance().GetMesh(meshPath);
+	std::shared_ptr<CMesh> pMesh = CMeshManager::Instance().GetMesh(meshName);
 	CShader* pShader = CResourcesManager::Instance().GetShader(shaderName);
 
 	if (!pMesh || !pShader)
 	{
-		sys_err("CreateObject: Could not find mesh '%s' or shader '%s'.", meshPath.c_str(), shaderName.c_str());
+		sys_err("CreateObject: Could not find mesh '%s' or shader '%s'.", meshName.c_str(), shaderName.c_str());
 		return (false);
 	}
 
@@ -430,7 +431,7 @@ bool CTerrainAreaData::CreateObject(const std::string& meshPath, const std::stri
 	// newObjectData.uiObjectID = m_vObjectsData.size() + 1;
 
 	// 3. Use your internal AddObject function to add it to the system.
-	AddObjectInstanceGroup(pShader, pMesh, newObjectData);
+	AddObjectInstanceGroup(pShader, pMesh.get(), newObjectData);
 
 	// 4. Return a pointer to the newly created object.
 	// The object we just added will be at the back of the master list.

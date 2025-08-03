@@ -127,6 +127,13 @@ bool CWindow::InitializeWindow(const std::string& stTitle, const GLuint& width, 
 		return (false);
 	}
 
+	glEnable(GL_DEPTH_TEST);
+	glFrontFace(GL_CW);
+	glCullFace(GL_BACK);
+	glEnable(GL_CULL_FACE);
+	glEnable(GL_MULTISAMPLE);
+	glEnable(GL_DEBUG_OUTPUT);
+
 	glfwSetFramebufferSizeCallback(m_pWindow, framebuffer_size_callback);
 	glfwSetCursorPosCallback(m_pWindow, mouse_callback);
 	glfwSetScrollCallback(m_pWindow, scroll_callback);
@@ -145,6 +152,9 @@ bool CWindow::InitializeWindow(const std::string& stTitle, const GLuint& width, 
 	{
 		glfwSetInputMode(m_pWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 	}
+
+	CMeshManager::Instance().LoadMeshesFromJson("resources/data/game_meshes.json");
+	CMeshManager::Instance().PopulateGlobalBuffers();
 
 	m_pTerrainManager = new CTerrainManager;
 	m_pTerrainManager->Create();

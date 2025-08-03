@@ -4,6 +4,7 @@
 #include "BoundingBox.h"
 #include <meshoptimizer/meshoptimizer.h>
 #include "../../LibMath/source/vectors.h"
+#include "MeshManager.h"
 
 CMesh::CMesh()
 {
@@ -14,6 +15,11 @@ CMesh::CMesh()
 	arr_mem_zero(m_uiBuffers);
 	m_bIsPBR = false;
 	m_uiMaxInstances = 1;
+	m_bNeedsUpdate = false;
+	m_iIndexCount = 0; // Number of indices in the mesh
+	m_iVertexCount = 0; // Number of vertices in the mesh
+	m_iIndexOffset = 0;
+	m_iVertexOffset = 0;
 }
 
 CMesh::~CMesh()
@@ -29,13 +35,10 @@ bool CMesh::LoadMesh(const std::string& stFileName, bool bIsUVFlipped)
 	// Create the VAO
 	if (IsGLVersionHigher(4, 5))
 	{
-		glCreateVertexArrays(1, &m_uiVAO);
 		glCreateBuffers(arr_size(m_uiBuffers), m_uiBuffers);
 	}
 	else
 	{
-		glGenVertexArrays(1, &m_uiVAO);
-		glBindVertexArray(m_uiVAO);
 		glGenBuffers(arr_size(m_uiBuffers), m_uiBuffers);
 	}
 
@@ -43,7 +46,7 @@ bool CMesh::LoadMesh(const std::string& stFileName, bool bIsUVFlipped)
 
 	if (bIsUVFlipped)
 	{
-		m_pScene = m_Importer.ReadFile(stFileName.c_str(), ASSIMP_LOAD_FLAGS_UV_FLIP);
+		m_pScene = m_Importer.ReadFile(stFileName.c_str(), ASSIMP_LOAD_FLAGS | aiProcess_FlipUVs);
 	}
 	else
 	{
@@ -69,9 +72,40 @@ bool CMesh::LoadMesh(const std::string& stFileName, bool bIsUVFlipped)
 
 	m_pPhysicsObject = new CPhysicsObject;
 
-	m_sMeshName = stFileName;
+	SetMeshFilePath(stFileName);
 
 	return (bRet);
+}
+
+void CMesh::Render(GLuint uiVAO)
+{
+	if (IsPBR())
+	{
+		SetupRenderMaterialsPBR();
+	}
+
+	glBindVertexArray(uiVAO);
+
+	for (GLuint uiMeshIndex = 0; uiMeshIndex < m_vMeshes.size(); ++uiMeshIndex)
+	{
+		const GLuint uiMaterialIndex = m_vMeshes[uiMeshIndex].uiMaterialIndex;
+		ASSERT(uiMaterialIndex < m_vMaterials.size(), "Check Mesh Materials");
+
+		if (!IsPBR())
+		{
+			SetupRenderMaterialsPhong(uiMeshIndex, uiMaterialIndex);
+		}
+
+		glDrawElementsBaseVertex(GL_TRIANGLES,
+			m_vMeshes[uiMeshIndex].uiNumIndices,
+			GL_UNSIGNED_INT,
+			(void*)(sizeof(unsigned int) * m_vMeshes[uiMeshIndex].uiBaseIndex),
+			m_vMeshes[uiMeshIndex].uiBaseVertex);
+
+	}
+
+	// Make sure the VAO is not changed from the outside
+	glBindVertexArray(0);
 }
 
 void CMesh::Render()
@@ -351,12 +385,6 @@ void CMesh::Clear()
 		glDeleteBuffers(arr_size(m_uiBuffers), m_uiBuffers);
 	}
 
-	if (m_uiVAO)
-	{
-		glDeleteVertexArrays(1, &m_uiVAO);
-		m_uiVAO = 0;
-	}
-
 	safe_delete(m_pPhysicsObject);
 }
 
@@ -455,20 +483,20 @@ void CMesh::InitSingleMeshOptimized(GLuint uiMeshIndex, const aiMesh* pMesh)
 	OptimizeMesh(uiMeshIndex, vecVertices, vecIndicies);
 }
 
-void CMesh::PopulateBuffers()
+void CMesh::PopulateBuffers(GLuint uiVAO)
 {
 	if (IsGLVersionHigher(4, 5))
 	{
-		PopulateBuffersDSA();
+		PopulateBuffersDSA(uiVAO);
 	}
 	else
 	{
-		PopulateBuffersNonDSA();
+		PopulateBuffersNonDSA(uiVAO);
 
 	}
 }
 
-void CMesh::PopulateBuffersDSA()
+void CMesh::PopulateBuffersDSA(GLuint uiVAO)
 {
 	glNamedBufferStorage(m_uiBuffers[VERTEX_BUFFER], sizeof(m_vVertices[0]) * m_vVertices.size(), m_vVertices.data(), 0);
 	glNamedBufferStorage(m_uiBuffers[INDEX_BUFFER], sizeof(m_vIndices[0]) * m_vIndices.size(), m_vIndices.data(), 0);
@@ -523,7 +551,7 @@ void CMesh::PopulateBuffersDSA()
 	glVertexArrayBindingDivisor(m_uiVAO, 2, 1);
 }
 
-void CMesh::PopulateBuffersNonDSA()
+void CMesh::PopulateBuffersNonDSA(GLuint uiVAO)
 {
 	glBindBuffer(GL_ARRAY_BUFFER, m_uiBuffers[VERTEX_BUFFER]);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_uiBuffers[INDEX_BUFFER]);
@@ -583,12 +611,7 @@ bool CMesh::InitFromScene(const aiScene* pScene, const std::string& stFileName)
 		return false;
 	}
 
-	PopulateBuffers();
-
-	if (!GLCheckError())
-	{
-		sys_err("GL Error: %d", glGetError());
-	}
+	//PopulateBuffers();
 
 	return GLCheckError();
 }
@@ -1115,4 +1138,3 @@ void CMesh::ResizeInstanceBuffers(GLuint newMaxInstances)
 		glBindVertexArray(0);
 	}
 }
-

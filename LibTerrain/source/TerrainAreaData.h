@@ -75,7 +75,7 @@ public:
 	std::vector<TObjectInstanceGroup>& GetObjectsGroups();
 
 	// Creates a new object dynamically and adds it to the terrain area.
-	bool CreateObject(const std::string& meshPath, const std::string& shaderName, const SVector3Df& position, const SVector3Df& rotation, const SVector3Df& scale);
+	bool CreateObject(const std::string& meshName, const std::string& shaderName, const SVector3Df& position, const SVector3Df& rotation, const SVector3Df& scale);
 
 	SVector3Df GetWorldOrigin() const;
 

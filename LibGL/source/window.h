@@ -7,6 +7,7 @@
 #include "FrameBuffer.h"
 #include "../../LibGame/source/ResourcesManager.h"
 #include "../../LibGame/source/PhysicsWorld.h"
+#include "../../LibGame/source/MeshManager.h"
 
 constexpr auto DEFAULT_WINDOW_WIDTH = 1260;
 constexpr auto DEFAULT_WINDOW_HEIGHT = 960;
@@ -51,12 +52,8 @@ public:
 	CScreen* GetScreen() { return m_pScreen; }
 
 	void Update(GLfloat fDeltaTime = 0.0f);
-
 	static CTerrainManager* GetTerrainManager();
-
 	CSkyBox* GetSkyBox() { return m_pSkyBox; }
-	CScreenSpaceShader& GetScreenSpaceShader() { return *m_pScreenSpaceShader; }
-	CScreenSpaceShader* GetScreenSpaceShaderPtr() { return m_pScreenSpaceShader; }
 
 protected:
 	void Destroy();
@@ -77,6 +74,7 @@ public: // Singleton Classes
 	CCameraManager camera_manager;
 	CResourcesManager resources_manager;
 	CPhysicsWorld physics_world;
+	CMeshManager meshManager;
 
 private:
 	GLFWwindow* m_pWindow;
