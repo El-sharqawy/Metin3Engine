@@ -10,6 +10,14 @@
 class CMesh;
 struct SMeshVertex;
 
+enum EBuffersTypes
+{
+	VERTEX_BUFFER,		// Vertex buffer
+	INDEX_BUFFER,		// Index Buffer
+	WVP_MAT_BUFFER,		// World View Projection buffer
+	WORLD_MAT_BUFFER,	// World matrix buffer
+	BUFFERS_MAX_NUM,	// Total number of buffers
+};
 
 class CMeshManager : public CSingleton<CMeshManager>
 {
@@ -57,7 +65,7 @@ private:
 	// Global OpenGL buffers (GPU side)
 	GLuint m_uiGlobalVAO; // Vertex Array Object
 
-	GLuint m_uiGlobalBuffers[4]; // Vertex Buffer, Index Buffer, WVP Matrix Buffer, World Matrix Buffer
+	GLuint m_uiGlobalBuffers[BUFFERS_MAX_NUM]; // Vertex Buffer, Index Buffer, WVP Matrix Buffer, World Matrix Buffer
 
 	GLuint m_uiMaxInstances; // Current buffer capacity for instancing
 };

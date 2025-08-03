@@ -12,16 +12,13 @@
 #include "../../LibTerrain/source/TerrainAreaData.h"
 #include "../../LibGame/source/Mesh.h"
 #include "../../LibGame/source/PhysicsObject.h"
+#include "../../UserInterface/source/Userinterface.h"
 
 static CWindow* appWnd = nullptr;
 GLuint CWindow::m_uiRandSeed = 0;
-CTerrainManager* CWindow::m_pTerrainManager = nullptr;
 
 CWindow::CWindow()
 {
-	m_pWindow = nullptr;
-	m_pFrameBufObj = nullptr;
-	m_pScreen = nullptr;
 	m_uiWidth = DEFAULT_WINDOW_WIDTH;
 	m_uiHeight = DEFAULT_WINDOW_HEIGHT;
 	m_stWindowName = "NoWindow";
@@ -48,16 +45,21 @@ CWindow::CWindow()
 #else
 	m_uiRandSeed = getpid();
 #endif
+	m_pWindow = nullptr;
+	m_pFrameBufObj = nullptr;
+	m_pScreen = nullptr;
+	m_pTerrainManager = nullptr;
 	m_pSkyBox = nullptr;
 	m_pScreenSpaceShader = nullptr;
+	m_pUserInterface = nullptr;
 }
 
 CWindow::CWindow(const std::string& stTitle, const GLuint& width, const GLuint& height, const bool& bIsFullScreen)
 {
-	m_uiWidth = width;
-	m_uiHeight = height;
-	m_stWindowName = stTitle;
-	m_bIsFullScreen = bIsFullScreen;
+	m_uiWidth = DEFAULT_WINDOW_WIDTH;
+	m_uiHeight = DEFAULT_WINDOW_HEIGHT;
+	m_stWindowName = "NoWindow";
+	m_bIsFullScreen = false;
 	m_bIsWireFrame = false;
 
 	m_bKeyBools = { false };
@@ -70,9 +72,23 @@ CWindow::CWindow(const std::string& stTitle, const GLuint& width, const GLuint& 
 	appWnd = this;
 
 	m_pCamera = CCameraManager::Instance().GetCurrentCamera();
-
+	m_bMouseState.at(0) = GLFW_RELEASE;
+	m_bMouseState.at(1) = GLFW_RELEASE;
+	m_bIsMouseFocusedIn = true;
+	m_fBrushInterval = 0.5f;
+	m_fBrushTimer = 0.0f;
+#if defined(_WIN64)
+	m_uiRandSeed = 0;
+#else
+	m_uiRandSeed = getpid();
+#endif
+	m_pWindow = nullptr;
+	m_pFrameBufObj = nullptr;
+	m_pScreen = nullptr;
+	m_pTerrainManager = nullptr;
 	m_pSkyBox = nullptr;
 	m_pScreenSpaceShader = nullptr;
+	m_pUserInterface = nullptr;
 
 	InitializeWindow(stTitle, width, height, bIsFullScreen);
 }
@@ -153,22 +169,7 @@ bool CWindow::InitializeWindow(const std::string& stTitle, const GLuint& width, 
 		glfwSetInputMode(m_pWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 	}
 
-	CMeshManager::Instance().LoadMeshesFromJson("resources/data/game_meshes.json");
-	CMeshManager::Instance().PopulateGlobalBuffers();
-
-	m_pTerrainManager = new CTerrainManager;
-	m_pTerrainManager->Create();
-	m_pTerrainManager->LoadMap("metin3_map_4v4");
-
-	m_pScreen = new CScreen;
-	m_pScreen->SetTerrainManager(m_pTerrainManager);
-
-	m_pSkyBox = new CSkyBox(this);
-
-	m_pScreenSpaceShader = new CScreenSpaceShader("shaders/post_processing.frag");
-
-	m_pFrameBufObj = new CFrameBuffer();
-	m_pFrameBufObj->Init(GetWidth(), GetHeight());
+	InitializeClasses();
 
 	SetWindowIcon("resources/icon/terrain.png");
 	return (true);
@@ -328,6 +329,29 @@ void CWindow::PrintGPUMemoryUsage_AMD()
 	}
 }
 
+void CWindow::InitializeClasses()
+{
+	CMeshManager::Instance().LoadMeshesFromJson("resources/data/game_meshes.json");
+	CMeshManager::Instance().PopulateGlobalBuffers();
+
+	m_pTerrainManager = new CTerrainManager;
+	m_pTerrainManager->Create();
+	m_pTerrainManager->LoadMap("metin3_map_4v4");
+
+	m_pScreen = new CScreen;
+	m_pScreen->SetTerrainManager(m_pTerrainManager);
+
+	m_pSkyBox = new CSkyBox(this);
+
+	m_pScreenSpaceShader = new CScreenSpaceShader("shaders/post_processing.frag");
+
+	m_pFrameBufObj = new CFrameBuffer();
+	m_pFrameBufObj->Init(GetWidth(), GetHeight());
+
+	m_pUserInterface = new CUserInterface(this);
+	m_pUserInterface->Discord_Start();
+}
+
 void CWindow::keys_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
 	bool bHandled = true;
@@ -371,14 +395,8 @@ void CWindow::keys_callback(GLFWwindow* window, int key, int scancode, int actio
 
 		case GLFW_KEY_LEFT_CONTROL:
 			appWnd->m_bIsWireFrame = !appWnd->m_bIsWireFrame;
-			if (appWnd->m_bIsWireFrame)
-			{
-				glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-			}
-			else
-			{
-				glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-			}
+			sys_log("appWnd->m_bIsWireFrame: %d", appWnd->m_bIsWireFrame);
+
 			break;
 		}
 	}
@@ -410,21 +428,35 @@ void CWindow::ResizeWindow(GLuint iWidth, GLuint iHeight)
 	m_uiHeight = iHeight;
 
 	if (GetFrameBuffer())
+	{
 		GetFrameBuffer()->BindForWriting();
+		GetFrameBuffer()->Resize(iWidth, iHeight);
+	}
 
 	glViewport(0, 0, iWidth, iHeight);
 
 	if (GetFrameBuffer())
+	{
 		GetFrameBuffer()->UnBindWriting();
+	}
 }
 
 void CWindow::Destroy()
 {
+	safe_delete(m_pFrameBufObj);
 	safe_delete(m_pScreen);
 	safe_delete(m_pTerrainManager);
 	safe_delete(m_pSkyBox);
+	safe_delete(m_pScreenSpaceShader);
 
+	// Destroy the user interface
+	m_pUserInterface->Discord_Close();
+	safe_delete(m_pUserInterface);
+
+	// Destroy the window and its resources
 	glfwDestroyWindow(m_pWindow);
+
+	// Terminate GLFW, clearing any resources allocated by GLFW.
 	glfwTerminate();
 }
 
@@ -512,16 +544,6 @@ void CWindow::Update(GLfloat fDeltaTime)
 
 	ProcessInput(fDeltaTime);
 
-	if (appWnd->m_bIsWireFrame)
-	{
-		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	}
-	else
-	{
-		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-	}
-
-
 	if (m_pTerrainManager->IsMapReady())
 	{
 	//	m_pTerrainManager->Update();
@@ -529,11 +551,19 @@ void CWindow::Update(GLfloat fDeltaTime)
 
 		m_pScreen->Update();
 
+		if (appWnd->m_bIsWireFrame)
+		{
+			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+		}
+		else
+		{
+			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		}
+
 		m_pTerrainManager->GetMapRef().Render(fDeltaTime);
 	}
 	m_pFrameBufObj->UnBindWriting();
 
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	glDisable(GL_DEPTH_TEST);
 	glDisable(GL_CULL_FACE); // Ensure culling doesn’t interfere
@@ -549,6 +579,18 @@ void CWindow::Update(GLfloat fDeltaTime)
 	pScreenShader->setSampler2D("screenTexture", m_pFrameBufObj->GetTextureID(), 0);
 	pScreenShader->setSampler2D("depthTex", m_pFrameBufObj->GetDepthTextureID(), 1);
 	m_pScreenSpaceShader->Render();
+
+	UpdateRenderUI();
+
+	WindowSwapAndBufferEvents();
+}
+
+void CWindow::UpdateRenderUI()
+{
+	// will call Update for all Models!
+	m_pUserInterface->Update();
+	// Render UI on top
+	m_pUserInterface->Render();
 }
 
 CTerrainManager* CWindow::GetTerrainManager()

@@ -93,24 +93,17 @@ public:
 	void SetIndexCount(size_t iCount) { m_iIndexCount = iCount; }
 	void SetVertexCount(size_t iCount) { m_iVertexCount = iCount; }
 
-	void PopulateBuffers(GLuint uiVAO);
-
 protected:
 	void Clear();
 	void ReserveSpace(GLuint uiNumVertices, GLuint uiNumIndices);
 	void InitSingleMesh(const aiMesh* pMesh);
 	void InitSingleMeshOptimized(GLuint uiMeshIndex, const aiMesh* pMesh);
-	void PopulateBuffersDSA(GLuint uiVAO);
-	void PopulateBuffersNonDSA(GLuint uiVAO);
 
 	std::vector<TMeshEntry> m_vMeshes;
 	std::vector<GLuint> m_vIndices;
 
 	const aiScene* m_pScene;
 	CMatrix4Df m_matGlobalInverseTransform;
-
-	GLuint m_uiVAO;
-	GLuint m_uiBuffers[BUFFERS_MAX_NUM];
 
 public:
 	bool InitFromScene(const aiScene* pScene, const std::string& stFileName);
@@ -162,7 +155,6 @@ private:
 private:
 	CPhysicsObject* m_pPhysicsObject;
 	bool m_bNeedsUpdate;
-	GLuint m_uiMaxInstances; // current buffer capacity
 	std::string m_stMeshFilePath;
 	std::string m_stMeshName;
 

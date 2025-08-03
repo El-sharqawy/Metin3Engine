@@ -19,34 +19,35 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <VCProjectVersion>17.0</VCProjectVersion>
+    <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{3f3d76a2-51a9-4b89-9a3b-9a4db0e7e53a}</ProjectGuid>
-    <RootNamespace>UserInterface</RootNamespace>
+    <ProjectGuid>{9b4d0ea5-f630-4d9d-9c5d-f562a8f6cd67}</ProjectGuid>
+    <RootNamespace>discordrpc</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>LibDiscord</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
+    <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
+    <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
+    <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
+    <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
@@ -70,16 +71,35 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ExternalIncludePath>A:\Mt2Death\Sources\Client\extern\include\;$(ExternalIncludePath)</ExternalIncludePath>
+    <LibraryPath>A:\Mt2Death\Sources\Client\extern\lib;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <OutDir>..\..\extern\library\</OutDir>
+    <IncludePath>D:\AnubisProjectNew\Sources\Client\extern\include;$(IncludePath)</IncludePath>
+    <LibraryPath>D:\AnubisProjectNew\Sources\Client\extern\library;$(LibraryPath)</LibraryPath>
+    <IntDir />
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <IncludePath>D:\AnubisProjectNew\Sources\Client\extern\include;$(IncludePath)</IncludePath>
+    <LibraryPath>D:\AnubisProjectNew\Sources\Client\extern\library;$(LibraryPath)</LibraryPath>
+    <OutDir>..\..\extern\library\</OutDir>
+    <IntDir />
+    <TargetName>$(ProjectName)_d</TargetName>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <ExternalIncludePath>$(SolutionDir)/Extern/Include;$(IncludePath)</ExternalIncludePath>
-    <LibraryPath>$(SolutionDir)/Extern/lib;$(LibraryPath)</LibraryPath>
+    <ExternalIncludePath>$(ExternalIncludePath)</ExternalIncludePath>
+    <IncludePath>$(SolutionDir)/Extern/Include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -92,8 +112,11 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>A:\Mt2Death\Sources\Client\extern\include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -108,7 +131,6 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -121,8 +143,11 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>A:\Mt2Death\Sources\Client\extern\include\discord_rpc\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -132,32 +157,19 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="source\Engine.cpp" />
-    <ClCompile Include="source\Userinterface.cpp" />
+    <ClCompile Include="src\connection_win.cpp" />
+    <ClCompile Include="src\discord_register_win.cpp" />
+    <ClCompile Include="src\discord_rpc.cpp" />
+    <ClCompile Include="src\dllmain.cpp" />
+    <ClCompile Include="src\rpc_connection.cpp" />
+    <ClCompile Include="src\serialization.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\LibDiscord\discord_rpc.vcxproj">
-      <Project>{9b4d0ea5-f630-4d9d-9c5d-f562a8f6cd67}</Project>
-    </ProjectReference>
-    <ProjectReference Include="..\LibGame\LibGame.vcxproj">
-      <Project>{96697466-fb22-4bc3-a07d-ddb7753faa8b}</Project>
-    </ProjectReference>
-    <ProjectReference Include="..\LibGL\LibGL.vcxproj">
-      <Project>{81037902-32c9-4625-a588-b09e885646e6}</Project>
-    </ProjectReference>
-    <ProjectReference Include="..\LibImageUI\LibImageUI.vcxproj">
-      <Project>{3e68cc81-8c3e-45d6-9b8e-9a091327b327}</Project>
-    </ProjectReference>
-    <ProjectReference Include="..\LibMath\LibMath.vcxproj">
-      <Project>{19a5c093-29ba-4133-a4c6-2355e51550f5}</Project>
-    </ProjectReference>
-    <ProjectReference Include="..\LibTerrain\LibTerrain.vcxproj">
-      <Project>{1c6c8b1e-32e9-400f-a264-278b7d63509f}</Project>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="source\CommonDefines.h" />
-    <ClInclude Include="source\Userinterface.h" />
+    <ClInclude Include="src\backoff.h" />
+    <ClInclude Include="src\connection.h" />
+    <ClInclude Include="src\msg_queue.h" />
+    <ClInclude Include="src\rpc_connection.h" />
+    <ClInclude Include="src\serialization.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

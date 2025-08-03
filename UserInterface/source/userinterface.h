@@ -6,6 +6,7 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 
 #include "../../LibImageUI/stdafx.h"
+#include "CommonDefines.h"
 
 class CTerrainManager;
 

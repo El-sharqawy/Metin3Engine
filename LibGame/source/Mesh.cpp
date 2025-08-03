@@ -11,10 +11,7 @@ CMesh::CMesh()
 	m_pScene = nullptr;
 	m_pPhysicsObject = nullptr;
 	m_matGlobalInverseTransform.InitIdentity();
-	m_uiVAO = 0;
-	arr_mem_zero(m_uiBuffers);
 	m_bIsPBR = false;
-	m_uiMaxInstances = 1;
 	m_bNeedsUpdate = false;
 	m_iIndexCount = 0; // Number of indices in the mesh
 	m_iVertexCount = 0; // Number of vertices in the mesh
@@ -31,16 +28,6 @@ bool CMesh::LoadMesh(const std::string& stFileName, bool bIsUVFlipped)
 {
 	// Release the previously loaded mesh (if it exists)
 	Clear();
-
-	// Create the VAO
-	if (IsGLVersionHigher(4, 5))
-	{
-		glCreateBuffers(arr_size(m_uiBuffers), m_uiBuffers);
-	}
-	else
-	{
-		glGenBuffers(arr_size(m_uiBuffers), m_uiBuffers);
-	}
 
 	bool bRet = false;
 
@@ -102,104 +89,6 @@ void CMesh::Render(GLuint uiVAO)
 			(void*)(sizeof(unsigned int) * m_vMeshes[uiMeshIndex].uiBaseIndex),
 			m_vMeshes[uiMeshIndex].uiBaseVertex);
 
-	}
-
-	// Make sure the VAO is not changed from the outside
-	glBindVertexArray(0);
-}
-
-void CMesh::Render()
-{
-	if (IsPBR())
-	{
-		SetupRenderMaterialsPBR();
-	}
-
-	glBindVertexArray(m_uiVAO);
-
-	for (GLuint uiMeshIndex = 0; uiMeshIndex < m_vMeshes.size(); ++uiMeshIndex)
-	{
-		const GLuint uiMaterialIndex = m_vMeshes[uiMeshIndex].uiMaterialIndex;
-		ASSERT(uiMaterialIndex < m_vMaterials.size(),  "Check Mesh Materials");
-
-		if (!IsPBR())
-		{
-			SetupRenderMaterialsPhong(uiMeshIndex, uiMaterialIndex);
-		}
-
-		glDrawElementsBaseVertex(GL_TRIANGLES,
-			m_vMeshes[uiMeshIndex].uiNumIndices,
-			GL_UNSIGNED_INT,
-			(void*)(sizeof(unsigned int) * m_vMeshes[uiMeshIndex].uiBaseIndex),
-			m_vMeshes[uiMeshIndex].uiBaseVertex);
-
-	}
-
-	// Make sure the VAO is not changed from the outside
-	glBindVertexArray(0);
-}
-
-void CMesh::Render(GLuint uiDrawIndex, GLuint uiPrimID)
-{
-	glBindVertexArray(m_uiVAO);
-	const GLuint uiMaterialIndex = m_vMeshes[uiDrawIndex].uiMaterialIndex;
-	ASSERT(uiMaterialIndex < m_vMaterials.size(), "Check Mesh Materials");
-
-	if (m_vMaterials[uiMaterialIndex].m_pDiffuseMap)
-	{
-		m_vMaterials[uiMaterialIndex].m_pDiffuseMap->Bind(COLOR_TEXTURE_UNIT);
-	}
-
-	if (m_vMaterials[uiMaterialIndex].m_pSpecularMap)
-	{
-		m_vMaterials[uiMaterialIndex].m_pSpecularMap->Bind(SPECULAR_EXPONENT_UNIT);
-	}
-
-	glDrawElementsBaseVertex(GL_TRIANGLES, 3, GL_UNSIGNED_INT, (void*)(sizeof(GLuint) *(m_vMeshes[uiDrawIndex].uiBaseIndex + uiPrimID * 3)), m_vMeshes[uiDrawIndex].uiBaseVertex);
-	// Make sure the VAO is not changed from the outside
-	glBindVertexArray(0);
-
-}
-
-void CMesh::Render(GLuint uiNumInstances, const std::vector<CMatrix4Df>& matWorld, const std::vector<CMatrix4Df>& matWVP)
-{
-	const GLuint iInstances = static_cast<GLuint>(matWorld.size());
-
-	if (iInstances > m_uiMaxInstances)
-		ResizeInstanceBuffers(iInstances);
-
-	if (IsGLVersionHigher(4, 5))
-	{
-		glNamedBufferSubData(m_uiBuffers[WVP_MAT_BUFFER], 0, sizeof(CMatrix4Df) * iInstances, matWVP.data());
-		glNamedBufferSubData(m_uiBuffers[WORLD_MAT_BUFFER], 0, sizeof(CMatrix4Df) * iInstances, matWorld.data());
-	}
-	else
-	{
-		glBindBuffer(GL_ARRAY_BUFFER, m_uiBuffers[WVP_MAT_BUFFER]);
-		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(CMatrix4Df) * iInstances, matWVP.data());
-
-		glBindBuffer(GL_ARRAY_BUFFER, m_uiBuffers[WORLD_MAT_BUFFER]);
-		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(CMatrix4Df) * iInstances, matWorld.data());
-	}
-
-	glBindVertexArray(m_uiVAO);
-
-	for (size_t i = 0; i < m_vMeshes.size(); i++)
-	{
-		const GLuint uiMaterialIndex = m_vMeshes[i].uiMaterialIndex;
-		ASSERT(uiMaterialIndex < m_vMaterials.size(), "Check Mesh Materials");
-
-		if (m_vMaterials[uiMaterialIndex].m_pDiffuseMap)
-		{
-			m_vMaterials[uiMaterialIndex].m_pDiffuseMap->Bind(COLOR_TEXTURE_UNIT);
-		}
-
-		if (m_vMaterials[uiMaterialIndex].m_pSpecularMap)
-		{
-			m_vMaterials[uiMaterialIndex].m_pSpecularMap->Bind(SPECULAR_EXPONENT_UNIT);
-		}
-
-		glDrawElementsInstancedBaseVertex(GL_TRIANGLES, m_vMeshes[i].uiNumIndices, GL_UNSIGNED_INT, (void*)(sizeof(GLuint)* m_vMeshes[i].uiBaseIndex), iInstances, m_vMeshes[i].uiBaseVertex);
 	}
 
 	// Make sure the VAO is not changed from the outside
@@ -380,11 +269,6 @@ TBoundingBox& CMesh::GetBoundingBox()
 
 void CMesh::Clear()
 {
-	if (m_uiBuffers[0])
-	{
-		glDeleteBuffers(arr_size(m_uiBuffers), m_uiBuffers);
-	}
-
 	safe_delete(m_pPhysicsObject);
 }
 
@@ -481,114 +365,6 @@ void CMesh::InitSingleMeshOptimized(GLuint uiMeshIndex, const aiMesh* pMesh)
 	}
 
 	OptimizeMesh(uiMeshIndex, vecVertices, vecIndicies);
-}
-
-void CMesh::PopulateBuffers(GLuint uiVAO)
-{
-	if (IsGLVersionHigher(4, 5))
-	{
-		PopulateBuffersDSA(uiVAO);
-	}
-	else
-	{
-		PopulateBuffersNonDSA(uiVAO);
-
-	}
-}
-
-void CMesh::PopulateBuffersDSA(GLuint uiVAO)
-{
-	glNamedBufferStorage(m_uiBuffers[VERTEX_BUFFER], sizeof(m_vVertices[0]) * m_vVertices.size(), m_vVertices.data(), 0);
-	glNamedBufferStorage(m_uiBuffers[INDEX_BUFFER], sizeof(m_vIndices[0]) * m_vIndices.size(), m_vIndices.data(), 0);
-
-	glVertexArrayVertexBuffer(m_uiVAO, 0, m_uiBuffers[VERTEX_BUFFER], 0, sizeof(TMeshVertex));
-	glVertexArrayElementBuffer(m_uiVAO, m_uiBuffers[INDEX_BUFFER]);
-
-	size_t sNumFloats = 0;
-
-	glEnableVertexArrayAttrib(m_uiVAO, POSITION_LOCATION);
-	glVertexArrayAttribFormat(m_uiVAO, POSITION_LOCATION, 3, GL_FLOAT, GL_FALSE, (GLuint)(sNumFloats * sizeof(float)));
-	glVertexArrayAttribBinding(m_uiVAO, POSITION_LOCATION, 0);
-
-	sNumFloats += 3; // 3 Elements x,y,z for the position vector
-
-	glEnableVertexArrayAttrib(m_uiVAO, NORMALS_LOCATION);
-	glVertexArrayAttribFormat(m_uiVAO, NORMALS_LOCATION, 3, GL_FLOAT, GL_FALSE, (GLuint)(sNumFloats * sizeof(float)));
-	glVertexArrayAttribBinding(m_uiVAO, NORMALS_LOCATION, 0);
-
-	sNumFloats += 3; // 3 Elements x,y,z for the normals vector
-
-	glEnableVertexArrayAttrib(m_uiVAO, TEX_COORDS_LOCATION);
-	glVertexArrayAttribFormat(m_uiVAO, TEX_COORDS_LOCATION, 2, GL_FLOAT, GL_FALSE, (GLuint)(sNumFloats * sizeof(float)));
-	glVertexArrayAttribBinding(m_uiVAO, TEX_COORDS_LOCATION, 0);
-
-	sNumFloats += 2; // 3 Elements x,y for the tex coords vector
-
-	// Allocate WVP buffer
-	//glNamedBufferStorage(m_uiBuffers[WVP_MAT_BUFFER], sizeof(CMatrix4Df) * m_uiMaxInstances, nullptr, GL_DYNAMIC_STORAGE_BIT);
-	glNamedBufferData(m_uiBuffers[WVP_MAT_BUFFER], sizeof(CMatrix4Df) * m_uiMaxInstances, nullptr, GL_DYNAMIC_DRAW);
-
-	glVertexArrayVertexBuffer(m_uiVAO, 1, m_uiBuffers[WVP_MAT_BUFFER], 0, sizeof(CMatrix4Df));
-	for (GLuint i = 0; i < 4; i++)
-	{
-		glEnableVertexArrayAttrib(m_uiVAO, WVP_LOCATION + i);
-		glVertexArrayAttribFormat(m_uiVAO, WVP_LOCATION + i, 4, GL_FLOAT, GL_FALSE, i * sizeof(float) * 4);
-		glVertexArrayAttribBinding(m_uiVAO, WVP_LOCATION + i, 1); // Binding index 1 — matches buffer now
-	}
-	glVertexArrayBindingDivisor(m_uiVAO, 1, 1); // Per-instance
-
-	// Allocate World buffer
-	//glNamedBufferStorage(m_uiBuffers[WORLD_MAT_BUFFER], sizeof(CMatrix4Df) * m_uiMaxInstances, nullptr, GL_DYNAMIC_STORAGE_BIT);
-	glNamedBufferData(m_uiBuffers[WORLD_MAT_BUFFER], sizeof(CMatrix4Df) * m_uiMaxInstances, nullptr, GL_DYNAMIC_DRAW);
-
-	glVertexArrayVertexBuffer(m_uiVAO, 2, m_uiBuffers[WORLD_MAT_BUFFER], 0, sizeof(CMatrix4Df));
-	for (GLuint i = 0; i < 4; i++)
-	{
-		glEnableVertexArrayAttrib(m_uiVAO, WORLD_LOCATION + i);
-		glVertexArrayAttribFormat(m_uiVAO, WORLD_LOCATION + i, 4, GL_FLOAT, GL_FALSE, i * sizeof(float) * 4);
-		glVertexArrayAttribBinding(m_uiVAO, WORLD_LOCATION + i, 2); // Binding index 2 — match this
-	}
-	glVertexArrayBindingDivisor(m_uiVAO, 2, 1);
-}
-
-void CMesh::PopulateBuffersNonDSA(GLuint uiVAO)
-{
-	glBindBuffer(GL_ARRAY_BUFFER, m_uiBuffers[VERTEX_BUFFER]);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_uiBuffers[INDEX_BUFFER]);
-
-	glBufferData(GL_ARRAY_BUFFER, sizeof(m_vVertices[0]) * m_vVertices.size(), &m_vVertices[0], GL_STATIC_DRAW);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(m_vIndices[0]) * m_vIndices.size(), &m_vIndices[0], GL_STATIC_DRAW);
-
-	size_t sNumFloats = 0;
-
-	glEnableVertexAttribArray(POSITION_LOCATION);
-	glVertexAttribPointer(POSITION_LOCATION, 3, GL_FLOAT, GL_FALSE, sizeof(TMeshVertex), (const void*)(sNumFloats * sizeof(float)));
-	sNumFloats += 3;
-
-	glEnableVertexAttribArray(NORMALS_LOCATION);
-	glVertexAttribPointer(NORMALS_LOCATION, 3, GL_FLOAT, GL_FALSE, sizeof(TMeshVertex), (const void*)(sNumFloats * sizeof(float)));
-	sNumFloats += 3;
-
-	glEnableVertexAttribArray(TEX_COORDS_LOCATION);
-	glVertexAttribPointer(TEX_COORDS_LOCATION, 2, GL_FLOAT, GL_FALSE, sizeof(TMeshVertex), (const void*)(sNumFloats * sizeof(float)));
-
-	glBindBuffer(GL_ARRAY_BUFFER, m_uiBuffers[WVP_MAT_BUFFER]);
-
-	for (GLuint i = 0; i < 4; i++)
-	{
-		glEnableVertexAttribArray(WVP_LOCATION + i);
-		glVertexAttribPointer(WVP_LOCATION + i, 4, GL_FLOAT, GL_FALSE, sizeof(CMatrix4Df), (const GLvoid*)(sizeof(GLfloat) * i * 4));
-		glVertexAttribDivisor(WVP_LOCATION + i, 1);
-	}
-
-	glBindBuffer(GL_ARRAY_BUFFER, m_uiBuffers[WORLD_MAT_BUFFER]);
-
-	for (GLuint i = 0; i < 4; i++)
-	{
-		glEnableVertexAttribArray(WORLD_LOCATION + i);
-		glVertexAttribPointer(WORLD_LOCATION + i, 4, GL_FLOAT, GL_FALSE, sizeof(CMatrix4Df), (const GLvoid*)(sizeof(GLfloat) * i * 4));
-		glVertexAttribDivisor(WORLD_LOCATION + i, 1);
-	}
 }
 
 // Priave Members
@@ -1079,62 +855,5 @@ void CMesh::SetupRenderMaterialsPhong(GLuint uiMeshIndex, GLuint uiMaterialIndex
 	if (m_vMaterials[uiMaterialIndex].m_pSpecularMap)
 	{
 		m_vMaterials[uiMaterialIndex].m_pSpecularMap->Bind(SPECULAR_EXPONENT_UNIT);
-	}
-}
-
-void CMesh::ResizeInstanceBuffers(GLuint newMaxInstances)
-{
-	// Add some slack to avoid re-sizing too often
-	m_uiMaxInstances = newMaxInstances + 32;
-
-	if (IsGLVersionHigher(4, 5))
-	{
-		// --- Resize WVP Buffer ---
-		// 1. Create a new, larger data store for the buffer object
-		glNamedBufferData(m_uiBuffers[WVP_MAT_BUFFER], sizeof(CMatrix4Df) * m_uiMaxInstances, nullptr, GL_DYNAMIC_DRAW);
-		// 2. CRITICAL: Re-bind this new buffer data store to the VAO's binding point (index 1)
-		glVertexArrayVertexBuffer(m_uiVAO, 1, m_uiBuffers[WVP_MAT_BUFFER], 0, sizeof(CMatrix4Df));
-
-
-		// --- Resize World Buffer ---
-		// 1. Create a new, larger data store for the buffer object
-		glNamedBufferData(m_uiBuffers[WORLD_MAT_BUFFER], sizeof(CMatrix4Df) * m_uiMaxInstances, nullptr, GL_DYNAMIC_DRAW);
-		// 2. CRITICAL: Re-bind this new buffer data store to the VAO's binding point (index 2)
-		glVertexArrayVertexBuffer(m_uiVAO, 2, m_uiBuffers[WORLD_MAT_BUFFER], 0, sizeof(CMatrix4Df));
-	}
-	else
-	{
-		// To modify the vertex attribute bindings, we must bind the VAO first
-		glBindVertexArray(m_uiVAO);
-
-		// --- Resize WVP Buffer ---
-		// 1. Bind the buffer to the global context
-		glBindBuffer(GL_ARRAY_BUFFER, m_uiBuffers[WVP_MAT_BUFFER]);
-		// 2. Re-allocate its storage
-		glBufferData(GL_ARRAY_BUFFER, sizeof(CMatrix4Df) * m_uiMaxInstances, nullptr, GL_DYNAMIC_DRAW);
-		// 3. Re-configure the attribute pointers for the WVP matrix. This re-links the
-		//    newly allocated buffer to the attributes stored in the currently bound VAO.
-		for (GLuint i = 0; i < 4; i++)
-		{
-			glEnableVertexAttribArray(WVP_LOCATION + i);
-			glVertexAttribPointer(WVP_LOCATION + i, 4, GL_FLOAT, GL_FALSE, sizeof(CMatrix4Df), (const GLvoid*)(sizeof(GLfloat) * i * 4));
-			glVertexAttribDivisor(WVP_LOCATION + i, 1);
-		}
-
-		// --- Resize World Buffer ---
-		// 1. Bind the buffer to the global context
-		glBindBuffer(GL_ARRAY_BUFFER, m_uiBuffers[WORLD_MAT_BUFFER]);
-		// 2. Re-allocate its storage
-		glBufferData(GL_ARRAY_BUFFER, sizeof(CMatrix4Df) * m_uiMaxInstances, nullptr, GL_DYNAMIC_DRAW);
-		// 3. Re-configure the attribute pointers for the World matrix.
-		for (GLuint i = 0; i < 4; i++)
-		{
-			glEnableVertexAttribArray(WORLD_LOCATION + i);
-			glVertexAttribPointer(WORLD_LOCATION + i, 4, GL_FLOAT, GL_FALSE, sizeof(CMatrix4Df), (const GLvoid*)(sizeof(GLfloat) * i * 4));
-			glVertexAttribDivisor(WORLD_LOCATION + i, 1);
-		}
-
-		// Unbind the VAO to prevent accidental modification
-		glBindVertexArray(0);
 	}
 }

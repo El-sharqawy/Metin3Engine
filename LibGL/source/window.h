@@ -19,6 +19,7 @@ class CScreenSpaceShader;
 class CTerrainAreaData;
 class CMesh;
 class CShader;
+class CUserInterface;
 
 class CWindow : public CSingleton<CWindow>
 {
@@ -52,7 +53,7 @@ public:
 	CScreen* GetScreen() { return m_pScreen; }
 
 	void Update(GLfloat fDeltaTime = 0.0f);
-	static CTerrainManager* GetTerrainManager();
+	CTerrainManager* GetTerrainManager();
 	CSkyBox* GetSkyBox() { return m_pSkyBox; }
 
 protected:
@@ -70,6 +71,9 @@ protected:
 
 	static GLuint m_uiRandSeed;
 
+	void InitializeClasses();
+	void UpdateRenderUI();
+
 public: // Singleton Classes
 	CCameraManager camera_manager;
 	CResourcesManager resources_manager;
@@ -77,7 +81,7 @@ public: // Singleton Classes
 	CMeshManager meshManager;
 
 private:
-	GLFWwindow* m_pWindow;
+	// Window properties
 	GLuint m_uiWidth;
 	GLuint m_uiHeight;
 	std::string m_stWindowName;
@@ -89,9 +93,14 @@ private:
 	CCamera* m_pCamera;
 	GLfloat m_fBrushInterval;	// Time interval in seconds for brush application
 	GLfloat m_fBrushTimer;		// Timer to track elapsed time
+
+private:
+	// Class Pointers Members
+	GLFWwindow* m_pWindow;
 	CFrameBuffer* m_pFrameBufObj;
 	CScreen* m_pScreen;
-	static CTerrainManager* m_pTerrainManager;
+	CTerrainManager* m_pTerrainManager;
 	CSkyBox *m_pSkyBox;
 	CScreenSpaceShader* m_pScreenSpaceShader;
+	CUserInterface* m_pUserInterface;
 };

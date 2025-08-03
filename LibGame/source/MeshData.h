@@ -108,11 +108,3 @@ typedef struct SMaterial
 } TMaterial;
 #pragma pack(pop)
 
-enum EBuffersTypes
-{
-	VERTEX_BUFFER,		// Vertex buffer
-	INDEX_BUFFER,		// Index Buffer
-	WVP_MAT_BUFFER,		// World View Projection buffer
-	WORLD_MAT_BUFFER,	// World matrix buffer
-	BUFFERS_MAX_NUM,	// Total number of buffers
-};
