@@ -363,3 +363,4 @@ MigrationBackup/
 FodyWeavers.xsd
 /Extern/GrannyMeshDumper-master/GrannyMeshDumper
 /Extern/GrannyMeshDumper-master
+*.fbx
