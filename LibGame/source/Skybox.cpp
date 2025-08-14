@@ -9,7 +9,7 @@ CSkyBox::CSkyBox(CWindow* pWindow)
 	m_v3SkyColorTop = SVector3Df(0.5f, 0.7f, 0.8f) * 1.05f;
 	m_v3SkyColorBottom = SVector3Df(0.9f, 0.9f, 0.95f);
 
-	m_pSkyboxScreenSpace = new CScreenSpaceShader("shaders/skybox.frag", "SkyBoxShader");
+	m_pSkyboxScreenSpace = new CScreenSpaceShader("SkyBox");
 
 	//m_pSkyBoxNew = new CFrameBuffer();
 	//m_pSkyBoxNew->Init(pWindow->GetWidth(), pWindow->GetHeight());
@@ -35,7 +35,17 @@ CSkyBox::CSkyBox(CWindow* pWindow)
 
 	SunsetPresetTwo();
 	DefaultPreset();
+
+	SetupShadowMapResources();
 }
+
+CSkyBox::~CSkyBox()
+{
+	safe_delete(m_pSkyboxScreenSpace);
+	safe_delete(m_pSkyBoxNew);
+	safe_delete(m_pShadowMapFBO);
+}
+
 
 void CSkyBox::Render(const CCamera& rCamera)
 {
@@ -140,7 +150,10 @@ void CSkyBox::Update()
 	{
 		auto sigmoid = [](float fVal)
 			{
-				return (1 / (1.0f + std::exp(8.0f - fVal * 40.0f)));
+				const float TRANSITION_OFFSET = 8.0f;
+				const float TRANSITION_SHARPNESS = 40.0f;
+
+				return (1 / (1.0f + std::exp(TRANSITION_OFFSET - fVal * TRANSITION_SHARPNESS)));
 			};
 
 		MixSkyColorPresets(sigmoid(m_v3LightDir.y), m_sHighSunPreset, m_sPresetSunset);
@@ -205,9 +218,47 @@ void CSkyBox::MixSkyColorPresets(GLfloat fVal, const TColorPreset& p1, const TCo
 	m_v3FogColor = p1.v3FogColor * fA + p2.v3FogColor * fFactor;
 }
 
-CSkyBox::~CSkyBox()
+void CSkyBox::SetupShadowMapResources()
 {
-	safe_delete(m_pSkyboxScreenSpace);
-	safe_delete(m_pSkyBoxNew);
+	// 1. Create the simple depth shader
+	m_pShadowMapShader = CResourcesManager::Instance().GetShader("SkyBoxShadow");
+
+	m_pShadowMapFBO = new CShadowFrameBuffer();
+	m_pShadowMapFBO->Initialize(SHADOWTEXTURE_WIDTH, SHADOWTEXTURE_HEIGHT);
 }
 
+void CSkyBox::BeginShadowMapPass()
+{
+	m_pShadowMapFBO->BindForWriting();
+	glClear(GL_DEPTH_BUFFER_BIT);
+
+	// Transform each corner
+	// Convert to SVector3Df for easier min/max calculations
+	constexpr GLfloat minX = std::numeric_limits<GLfloat>::max();
+	constexpr GLfloat maxX = std::numeric_limits<GLfloat>::lowest();
+	constexpr GLfloat minY = std::numeric_limits<GLfloat>::max();
+	constexpr GLfloat maxY = std::numeric_limits<GLfloat>::lowest();
+	constexpr GLfloat minZ = std::numeric_limits<GLfloat>::max();
+	constexpr GLfloat maxZ = std::numeric_limits<GLfloat>::lowest();
+
+	// Create the orthographic projection info
+	SOrthoProjInfo lightOrthoInfo{};
+	lightOrthoInfo.fLeft = minX;
+	lightOrthoInfo.fRight = maxX;
+	lightOrthoInfo.fBottom = minY;
+	lightOrthoInfo.fTop = maxY;
+	lightOrthoInfo.fNearZ = minZ;
+	lightOrthoInfo.fFarZ = maxZ;
+
+	// create the final projection matrix
+	CMatrix4Df lightProjection;
+	lightProjection.InitOrthoProjTransform(lightOrthoInfo);
+
+	// final light-space matrix is ready
+	m_m4LightSpaceMatrix = lightProjection;
+}
+
+void CSkyBox::EndShadowMapPass()
+{
+	m_pShadowMapFBO->UnBindWriting();
+}

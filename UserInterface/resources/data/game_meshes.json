@@ -1,5 +1,28 @@
 {
+    "soldier_mesh": {
+        "crc32": 4165377982,
+        "filePath": "resources\\models\\soldier.fbx",
+        "flip_uvs": true,
+        "physics": {
+            "friction": 0.5,
+            "gravity_enabled": true,
+            "is_collidable": true,
+            "mass": 1.0,
+            "restitution": 1.0,
+            "type": 2
+        }
+    },
     "warrior_mesh": {
-        "filePath": "resources/models/test1.obj"
+        "crc32": 2630873105,
+        "filePath": "resources\\models\\warrior_mesh.obj",
+        "flip_uvs": false,
+        "physics": {
+            "friction": 0.5,
+            "gravity_enabled": true,
+            "is_collidable": true,
+            "mass": 1.0,
+            "restitution": 1.0,
+            "type": 2
+        }
     }
 }

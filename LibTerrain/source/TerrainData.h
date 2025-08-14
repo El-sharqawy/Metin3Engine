@@ -67,8 +67,13 @@ enum ETerrainData
 
 	HEIGHT_WATER_XRATIO = WATERMAP_XSIZE / XSIZE,					// Tiles per cell width (2:1)
 	HEIGHT_WATER_ZRATIO = WATERMAP_ZSIZE / ZSIZE,					// Tiles per cell depth (2:1)
+
+	SHADOWMAP_XSIZE = XSIZE * 2,
+	SHADOWMAP_ZSIZE = ZSIZE * 2,
 };
 
+#pragma pack(push)
+#pragma pack(1)
 typedef struct STerrainTexture
 {
 	std::string m_stFileName;
@@ -91,8 +96,6 @@ typedef struct STerrainTexture
 
 } TTerrainTexture;
 
-#pragma pack(push)
-#pragma pack(1)
 typedef struct STerrainVertex
 {
 	SVector3Df m_v3Position;	// World position

@@ -1,24 +1,22 @@
 #include "stdafx.h"
 #include "ScreenSpaceShader.h"
+#include "../../LibGame/source/ResourcesManager.h"
 
 bool CScreenSpaceShader::m_bInitialized = false;
 GLuint CScreenSpaceShader::m_uiQuadVAO = 0;
 GLuint CScreenSpaceShader::m_uiQuadVBO = 0;
 
-CScreenSpaceShader::CScreenSpaceShader(const std::string& stFragmentShader, const std::string& stName)
+CScreenSpaceShader::CScreenSpaceShader(const std::string& stName)
 {
 	InitializeQuad();
 
-	m_pScreenShader = new CShader(stName);
-	m_pScreenShader->AttachShader("shaders/screen.vert");
-	m_pScreenShader->AttachShader(stFragmentShader.c_str());
-	m_pScreenShader->LinkPrograms();
+	m_pScreenShader = CResourcesManager::Instance().GetShader(stName);
 }
 
 CScreenSpaceShader::~CScreenSpaceShader()
 {
-	delete m_pScreenShader;
-	m_pScreenShader = nullptr;
+	//delete m_pScreenShader;
+	//m_pScreenShader = nullptr;
 }
 
 CShader* const CScreenSpaceShader::GetShaderPtr()

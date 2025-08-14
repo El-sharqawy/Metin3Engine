@@ -25,11 +25,14 @@ void CPhysicsObject::Reset()
 	m_ePhysicsType = EObjectTypes::OBJECT_TYPE_NONE;
 	m_v3AngularVelocity.SetToZero();
 	m_v3Torque.SetToZero();
-	m_fMomentOfInertia = 1.0f; // Default moment of inertia for simplicity
-	m_fRestitution = 0.5f; // 0 = no bounce, 1 = perfect bounce
+	m_fMomentOfInertia = 1.0f;			// Default moment of inertia for simplicity
+	m_fRestitution = 0.5f;				// 0 = no bounce, 1 = perfect bounce
 	m_pTerrainMap = nullptr;
 	m_bSelectedObject = false;
 	m_lObjectID = 0;
+	m_bIsTransformDirty = true;			// Start as dirty
+	m_stObjectName = "PhysicsObject";	// Default name
+	m_stTypeName = "None";				// Default type name
 }
 
 const SVector3Df& CPhysicsObject::GetPosition() const
@@ -40,6 +43,9 @@ const SVector3Df& CPhysicsObject::GetPosition() const
 void CPhysicsObject::SetPosition(const SVector3Df& v3Pos)
 {
 	 m_WorldTranslation.SetPosition(v3Pos);
+
+	 // Mark as dirty
+	 m_bIsTransformDirty = true;
 }
 
 const SVector3Df& CPhysicsObject::GetRotation() const
@@ -50,6 +56,9 @@ const SVector3Df& CPhysicsObject::GetRotation() const
 void CPhysicsObject::SetRotation(const SVector3Df& v3Rot)
 {
 	m_WorldTranslation.SetRotation(v3Rot);
+
+	// Mark as dirty
+	m_bIsTransformDirty = true;
 }
 
 const SVector3Df& CPhysicsObject::GetScale() const
@@ -60,6 +69,9 @@ const SVector3Df& CPhysicsObject::GetScale() const
 void CPhysicsObject::SetScale(const SVector3Df& v3Scale)
 {
 	m_WorldTranslation.SetScale(v3Scale);
+
+	// Mark as dirty
+	m_bIsTransformDirty = true;
 }
 
 const CWorldTranslation& CPhysicsObject::GetWorldTranslation() const
@@ -70,6 +82,9 @@ const CWorldTranslation& CPhysicsObject::GetWorldTranslation() const
 void CPhysicsObject::SetWorldTranslation(const CWorldTranslation& worldT)
 {
 	m_WorldTranslation = worldT;
+
+	// Mark as dirty
+	m_bIsTransformDirty = true;
 }
 
 const SVector3Df& CPhysicsObject::GetVelocity() const
@@ -269,8 +284,9 @@ void CPhysicsObject::Update(float fDeltaTime)
 	// Integrate acceleration to velocity
 	m_v3Velocity += GetAcceleration() * fDeltaTime; // Update velocity based on acceleration
 
-	// Apply friction (simple linear damping)
-	m_v3Velocity *= (1.0f - GetFriction() * fDeltaTime);
+	// Apply friction (simple linear damping), make sure it's never negative
+	GLfloat fDamping = std::max(0.0f, 1.0f - GetFriction() * fDeltaTime);
+	m_v3Velocity *= fDamping;
 
 	// Integrate velocity to position
 	SVector3Df newPos = m_WorldTranslation.GetPosition() + GetVelocity() * fDeltaTime;
@@ -359,7 +375,11 @@ void CPhysicsObject::Update(float fDeltaTime)
 	// Reset torque for next frame
 	m_v3Torque.SetToZero();
 
-	m_BoundingBoxWorld = m_BoundingBoxLocal.Transform(m_WorldTranslation.GetMatrix());
+	// Update the world matrix if the transform is dirty
+	m_bIsTransformDirty = true;
+
+	// Update the bounding box world position
+	m_BoundingBoxWorld = m_BoundingBoxLocal.Transform(GetWorldMatrix());
 }
 
 void CPhysicsObject::ApplyForce(const SVector3Df& v3Force)
@@ -533,4 +553,54 @@ void CPhysicsObject::Launch(GLfloat fSpeed, GLfloat fElevationDeg, GLfloat fAzim
 
 	SetVelocity(SVector3Df(vx, vy, vz));
 	SetOnGround(false);
+}
+
+const CMatrix4Df& CPhysicsObject::GetWorldMatrix()
+{
+	// Check if the transform data has changed
+	if (m_bIsTransformDirty)
+	{
+		// Store the new, correct matrix
+		m_m4WorldMatrix = m_WorldTranslation.GetMatrix();
+
+		// 2. Clear the flag, as the matrix is now up-to-date
+		m_bIsTransformDirty = false;
+	}
+	
+	// 3. Return the cached matrix, either the one that is just built or the old one
+	return m_m4WorldMatrix;
+}
+
+const std::string& CPhysicsObject::GetObjectName() const
+{
+	return (m_stObjectName);
+}
+
+void CPhysicsObject::SetObjectName(const std::string& stObjectName)
+{
+	m_stObjectName = stObjectName;
+	m_bIsTransformDirty = true; // Mark as dirty since the name change might affect rendering or selection
+}
+
+const std::string& CPhysicsObject::GetTypeName()
+{
+	if (m_ePhysicsType == OBJECT_TYPE_STATIC)
+	{
+		m_stTypeName = "Static";
+	}
+	else if (m_ePhysicsType == OBJECT_TYPE_DYNAMIC)
+	{
+		m_stTypeName = "Dynamic";
+	}
+	else if (m_ePhysicsType == OBJECT_TYPE_KINEMATIC)
+	{
+		m_stTypeName = "Kinematic";
+	}
+
+	return m_stTypeName;
+}
+
+void CPhysicsObject::SetTypeName(const std::string& stTypeName)
+{
+	m_stTypeName = stTypeName;
 }

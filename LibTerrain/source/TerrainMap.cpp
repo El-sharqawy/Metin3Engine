@@ -1,6 +1,10 @@
 #include "Stdafx.h"
 #include "TerrainMap.h"
 #include "TerrainAreaData.h"
+#include "../../LibGL/source/FrameBuffer.h"
+#include "../../LibGL/source/Texture.h"
+#include "../../LibGL/source/Window.h"
+#include "../../LibGame/source/SkyBox.h"
 
 CTerrainMap::CTerrainMap()
 {
@@ -81,24 +85,71 @@ bool CTerrainMap::UpdateMap(const SVector3Df& v3PlayerPos)
 	return (true);
 }
 
+void CTerrainMap::UpdateMapAreas()
+{
+	for (CTerrainAreaData* pArea : m_vLoadedAreas)
+	{
+		if (pArea)
+		{
+			pArea->UpdateAreaObjects();
+		}
+	}
+}
+
 void CTerrainMap::Render(GLfloat fDeltaTime)
 {
 	// Bind SSBO to index 0
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_uiTerrainHandlesSSBO);
 
-	for (const auto& it : m_vLoadedAreas)
+	// --- Calculate matrices and set states ONCE per frame ---
+	CCamera* pCamera = CCameraManager::Instance().GetCurrentCamera();
+	CMatrix4Df view = pCamera->GetMatrix();
+	CMatrix4Df projection{};
+	projection.InitPersProjTransform(pCamera->GetPersProjInfo());
+
+	if (CWindow::Instance().IsWireFrame())
 	{
-		if (it)
-		{
-			it->RenderAreaObjects(fDeltaTime);
-		}
+		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	}
+	else
+	{
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	}
 
+	// Render Water Reflection and Refraction FBOs
 	for (const auto& it : m_vLoadedTerrains)
 	{
 		if (it && it->IsReady())
 		{
-			it->Render();
+			it->RenderTerrainWaterFBOS();
+		}
+	}
+
+
+	// Render all loaded terrains
+	for (const auto& it : m_vLoadedTerrains)
+	{
+		if (it && it->IsReady())
+		{
+			it->RenderTerrainPatches();
+		}
+	}
+
+	// Render all loaded areas
+	for (const auto& it : m_vLoadedAreas)
+	{
+		if (it)
+		{
+			it->RenderAreaObjects(view, projection);
+		}
+	}
+
+	// Render all loaded terrain water
+	for (const auto& it : m_vLoadedTerrains)
+	{
+		if (it && it->IsReady())
+		{
+			it->RenderTerrainWater();
 		}
 	}
 

@@ -5,6 +5,9 @@
 #include "../../LibGL/source/FrameBuffer.h"
 #include "ScreenSpaceShader.h"
 
+constexpr int SHADOWTEXTURE_WIDTH = 2048; // Shadow texture quality will be 2048x2048
+constexpr int SHADOWTEXTURE_HEIGHT = 2048;
+
 typedef struct SColorPreset
 {
 	SVector3Df v3CloudColorBottom, v3SkyColorTop, v3SkyColorBottom;
@@ -38,6 +41,13 @@ public:
 
 	CFrameBuffer* GetFBO() { return m_pSkyBoxNew; }
 
+	void SetupShadowMapResources(); // Helper to create everything
+	void BeginShadowMapPass();
+	void EndShadowMapPass();
+
+	const CMatrix4Df& GetLightSpaceMatrix() const { return m_m4LightSpaceMatrix; }
+	CShadowFrameBuffer* GetShadowMapFBO() const { return m_pShadowMapFBO; }
+
 private:
 	SVector3Df m_v3SkyColorTop, m_v3SkyColorBottom;
 	CScreenSpaceShader* m_pSkyboxScreenSpace;
@@ -58,4 +68,9 @@ private:
 	SVector3Df m_v3LightPos; // Global light position, used for skybox rendering
 	SVector3Df m_v3LightColor; // Global light color, used for skybox rendering
 	SVector3Df m_v3FogColor; // Global fog color, used for skybox rendering
+
+	// ShadowMapping
+	CShader* m_pShadowMapShader; // Shader for shadow mapping
+	CShadowFrameBuffer* m_pShadowMapFBO; // The FBO to render into
+	CMatrix4Df m_m4LightSpaceMatrix; // The combined view*proj matrix for the light
 };

@@ -76,10 +76,10 @@ public:
 	const SVector3Df& GetTarget() const;
 	const SVector3Df& GetUp() const;
 	const SVector3Df& GetDirection() const;
-	const CMatrix4Df& GetProjectionMat() const;
 	const SPersProjInfo& GetPersProjInfo() const;
 
 	CMatrix4Df GetMatrix() const;
+	CMatrix4Df GetProjectionMat() const;
 	CMatrix4Df GetViewProjMatrix() const;
 	CMatrix4Df GetViewMatrix() const;
 	CMatrix4Df GetViewPortMatrix() const;

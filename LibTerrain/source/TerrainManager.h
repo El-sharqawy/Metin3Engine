@@ -2,6 +2,7 @@
 
 #include <glad/glad.h>
 #include <string>
+#include "../../LibMath/source/vectors.h"
 
 class CTerrainMap;
 class CPhysicsObject;
@@ -119,6 +120,13 @@ public:
 	void PickObject(const CRay& ray);
 	CPhysicsObject* GetCurrentPickedObject() const;
 
+	void GrabObject();
+	void ReleaseObject();
+	CPhysicsObject* GetCurrentGrabbedObject() const;
+
+	CPhysicsObject* AddObject(const std::string& meshName);
+	void DeleteObject(CPhysicsObject* pObjectToDelete);
+
 protected:
 	/*** Editor Variables ***/
 	// Map Vars
@@ -159,5 +167,7 @@ protected:
 
 	// Object Picker
 	bool m_bIsPickingObjects;
-	CPhysicsObject* m_pCurrentPickedObject;
+	CPhysicsObject* m_pCurrentPickedObject;	// The object we are hovering over
+	CPhysicsObject* m_pCurrentGrabbedObject; // The object you are actively dragging
+
 };

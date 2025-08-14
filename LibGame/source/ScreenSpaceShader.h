@@ -5,7 +5,7 @@
 class CScreenSpaceShader
 {
 public:
-	CScreenSpaceShader(const std::string& stFragmentShader, const std::string& stName = "ScreenSpaceShader");
+	CScreenSpaceShader(const std::string& stName = "ScreenSpaceShader");
 	~CScreenSpaceShader();
 
 	CShader* const GetShaderPtr();

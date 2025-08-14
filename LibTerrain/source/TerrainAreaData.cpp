@@ -2,6 +2,9 @@
 #include "TerrainAreaData.h"
 #include "../../LibGame/source/PhysicsObject.h"
 #include "../../LibGame/source/MeshManager.h"
+#include "../../LibGame/source/PhysicsWorld.h"
+#include "../../LibGL/source/Window.h"
+#include "../../LibGame/source/SkyBox.h"
 
 CTerrainAreaData::CTerrainAreaData()
 {
@@ -19,7 +22,6 @@ CTerrainAreaData::~CTerrainAreaData()
 void CTerrainAreaData::Clear()
 {
 	m_iAreaNum = 0;
-	m_vObjectsGroups.clear();
 }
 
 void CTerrainAreaData::Destroy()
@@ -37,6 +39,7 @@ void CTerrainAreaData::Destroy()
 		}
 	}
 	m_vObjectsGroups.clear();
+	m_vPendingObjects.clear();
 }
 
 void CTerrainAreaData::SetTerrainAreaDataMap(CTerrainMap* pMap)
@@ -68,8 +71,6 @@ void CTerrainAreaData::AddObjectInstanceGroup(CShader* pShader, CMesh* pMesh, co
 	//    The master list now "owns" this pointer and is responsible for deleting it.
 	SObjectData* newObjectData = new SObjectData(data);
 
-	CPhysicsWorld::Instance().AddObject(data.pPhysicsObject);
-
 	// 2. Find the correct render group for this object.
 	for (auto& group : m_vObjectsGroups)
 	{
@@ -90,108 +91,143 @@ void CTerrainAreaData::AddObjectInstanceGroup(CShader* pShader, CMesh* pMesh, co
 	m_vObjectsGroups.push_back(newGroup);
 }
 
-void CTerrainAreaData::RenderAreaObjects(GLfloat fDeltaTime)
+void CTerrainAreaData::RenderAreaObjects(const CMatrix4Df& viewMatrix, const CMatrix4Df& projectionMatrix)
 {
-	CMatrix4Df View = CCameraManager::Instance().GetCurrentCamera()->GetMatrix();
-	CMatrix4Df Projection{};
-	Projection.InitPersProjTransform(CCameraManager::Instance().GetCurrentCamera()->GetPersProjInfo());
+	CWindow::Instance().GetFrameBuffer()->BindForWriting();
 
-	CMatrix4Df WVP = Projection * View;
+	// Calculate the WVP matrix once per frame
+	CMatrix4Df VP = projectionMatrix * viewMatrix;
+	// Get camera position once before the loop
+	const SVector3Df& cameraPos = CCameraManager::Instance().GetCurrentCamera()->GetPosition();
 
+	// Get Object Groups
 	const auto& objectGroups = GetObjectsGroups();
+
 	for (const auto& group : objectGroups)
 	{
 		if (group.vecObjects.empty() || !group.pMesh || !group.pShader)
 		{
+			sys_log("CTerrainAreaData::RenderAreaObjects: Skipping group with no objects or mesh/shader.");
 			continue;
 		}
 
-		// Create TEMPORARY lists for only the VISIBLE objects
+		// Create lists for only the VISIBLE objects in this group
 		std::vector<CMatrix4Df> visibleWorldMatrices;
 		std::vector<CMatrix4Df> visibleWvpMatrices;
 
-		// Reserve memory to avoid reallocations
-		visibleWorldMatrices.reserve(group.vecObjects.size());
-		visibleWvpMatrices.reserve(group.vecObjects.size());
-
-		for (auto& objectData : group.vecObjects)
+		// --- COMBINED LOOP for culling, rendering, and debug drawing ---
+		for (const SObjectData* objectData : group.vecObjects)
 		{
-			if (!objectData)
+			if (!objectData || !objectData->pPhysicsObject ||
+				objectData->pPhysicsObject->GetType() == OBJECT_TYPE_NONE)
 			{
 				continue;
 			}
 
 			// You can add a distance check
-			float distanceToCamera = (CCameraManager::Instance().GetCurrentCamera()->GetPosition() - objectData->WorldTranslation.GetPosition()).length();
-
-			// e.g., Don't render grass patches that are more than 8000 units away
-			if (distanceToCamera > 8000.0f)
+			float distanceToCamera = (cameraPos - objectData->pPhysicsObject->GetPosition()).length();
+			// e.g., Don't render model patches that are more than 800 units away
+			if (distanceToCamera > 800.0f)
 			{
-				//continue; // Skip to the next object
+				continue; // Skip to the next object
 			}
 
-			if (objectData->eObjectType == OBJECT_TYPE_NONE)
+			// This object is visible, add it to the render list
+			const CMatrix4Df& worldMatrix = objectData->pPhysicsObject->GetWorldMatrix();
+
+			// Add matrices to the lists for instanced rendering
+			visibleWorldMatrices.push_back(worldMatrix);
+			visibleWvpMatrices.push_back(VP * worldMatrix);
+
+			// --- Debug Drawing (done in the same loop) ---
+			if (objectData->pPhysicsObject->IsSelectedObject()) // Example: Only draw if selected
 			{
-				continue; // Skip objects with no type
+				SBoundingBox worldBox = objectData->pPhysicsObject->GetBoundingBoxWorld();
+				worldBox.Draw(true);
 			}
-
-			CMatrix4Df worldMatrix{};
-
-			if (objectData->pPhysicsObject)
-			{
-				worldMatrix = objectData->pPhysicsObject->GetWorldTranslation().GetMatrix();
-			}
-			else
-			{
-				SVector3Df objPos = objectData->WorldTranslation.GetPosition(); // e.g., (768, 0, 0) + (15, 0, 20) = (783, 0, 20)
-				SVector3Df objRot = objectData->WorldTranslation.GetRotation();
-				SVector3Df objScale = objectData->WorldTranslation.GetScale();
-
-				// 3. Build the world matrix using the FINAL world position
-				CMatrix4Df translation, rotation, scale;
-				translation.InitTranslationTransform(objPos);
-				rotation.InitRotateTransform(objRot);
-				scale.InitScaleTransform(objScale);
-				worldMatrix = translation * rotation * scale;
-			}
-
-			// Add the known-good matrices to the render list.
-			visibleWvpMatrices.push_back(worldMatrix);
-			visibleWorldMatrices.push_back(WVP * worldMatrix);
 		}
 
-		// IMPORTANT: Only render if there are any visible objects in this group
+		// Only render if there are any visible objects in this group
 		if (!visibleWorldMatrices.empty())
 		{
-			group.pShader->Use();
-			//group.pMesh->Update(fDeltaTime);
+			CShader* pModelShader = group.pShader;
+			pModelShader->Use();
+
+			// Model Material Data
+			pModelShader->setVec4("uMaterial.v4AmbientColor", group.pMesh->GetMaterial().m_v4AmbientColor);
+			pModelShader->setVec4("uMaterial.v4DiffuseColor", group.pMesh->GetMaterial().m_v4DiffuseColor);
+			pModelShader->setVec4("uMaterial.v4SpecularColor", group.pMesh->GetMaterial().m_v4SpecularColor);
+			pModelShader->setInt("uMaterial.DiffuseMap", COLOR_TEXTURE_UNIT_INDEX);
+			pModelShader->setInt("uMaterial.SpecularMap", SPECULAR_EXPONENT_UNIT_INDEX);
+			pModelShader->setFloat("uMaterial.fShininess", 64.0f);
+
+
+			// Light Material Data
+			pModelShader->setVec3("uLightMaterial.v3LightColor", CSkyBox::Instance().GetLightColor());
+			pModelShader->setVec3("uLightMaterial.v3LightDirection", CSkyBox::Instance().GetLightDir());
+			pModelShader->setFloat("uLightMaterial.fAmbientIntensity", 0.1f);
+
+			pModelShader->setVec3("v3CameraPosition", cameraPos);
+
 			// Pass the temporary vectors of VISIBLE objects to the render function
-			//group.pMesh->Render(group.GetInstanceCount(), visibleWvpMatrices, visibleWorldMatrices);
-			CMeshManager::Instance().RenderMeshInstanced(group.pMesh->GetMeshName(), group.GetInstanceCount(), visibleWorldMatrices, visibleWvpMatrices);
+			// NOTE: The instance count is now the size of the visible objects vector
 
-			for (auto& objectData : group.vecObjects)
+			CMeshManager::Instance().RenderMeshInstanced(
+				group.pMesh->GetMeshName(),
+				visibleWorldMatrices.size(), // Use the count of visible objects
+				visibleWorldMatrices,
+				visibleWvpMatrices
+			);
+		}
+	}
+
+	CWindow::Instance().GetFrameBuffer()->UnBindWriting();
+}
+
+void CTerrainAreaData::RenderAreaObjectsForDepth()
+{
+	// Loop through all render groups in this area
+	for (const auto& group : GetObjectsGroups())
+	{
+		if (group.vecObjects.empty() || !group.pMesh)
+		{
+			continue;
+		}
+
+		// We will collect the world matrices of all objects in the group
+		std::vector<CMatrix4Df> worldMatrices;
+		worldMatrices.reserve(group.vecObjects.size());
+	
+		for (const SObjectData* objectData : group.vecObjects)
+		{
+			// No need for camera culling here; the light's frustum handles culling.
+			if (!objectData || !objectData->pPhysicsObject)
 			{
-				if (objectData && objectData->pPhysicsObject)
-				{
-					CPhysicsWorld::Instance().Update(fDeltaTime);
-
-					// 3. Create a TEMPORARY world-space box for drawing this frame
-					SBoundingBox worldBox = objectData->pPhysicsObject->GetBoundingBoxWorld();
-
-					// 4. Draw the correctly transformed box
-					worldBox.Draw(objectData->pPhysicsObject->IsSelectedObject());
-				}
+				continue;
 			}
+
+			worldMatrices.push_back(objectData->pPhysicsObject->GetWorldMatrix());
+		}
+
+		// Perform one instanced draw call for the entire group
+		if (!worldMatrices.empty())
+		{
+			// For the depth pass, we only need the model matrices.
+			// Your instanced rendering function should be able to handle this.
+			// You might need to adjust it to take a single list of matrices.
+			CMeshManager::Instance().RenderMeshInstancedForDepth(
+				group.pMesh->GetMeshName(),
+				worldMatrices.size(),
+				worldMatrices
+			);
 		}
 	}
 }
 
 bool CTerrainAreaData::LoadAreaObjectsFromFile(const std::string& stAreaObjectsData)
 {
-	Clear();
-
 	// Clear any existing data before loading
-	this->Clear();
+	Clear();
 
 	// File Reading and JSON Parsing
 	try
@@ -215,38 +251,59 @@ bool CTerrainAreaData::LoadAreaObjectsFromFile(const std::string& stAreaObjectsD
 			std::string meshName = groupJson["name"];
 			std::string shaderName = groupJson["shader"];
 
-			std::shared_ptr<CMesh> pMesh = CMeshManager::Instance().GetMesh(meshName);
-			CShader* pShader = CResourcesManager::Instance().GetShader(shaderName);
-
-			if (!pMesh || !pShader)
-			{
-				sys_err("LoadAreaObjectsFromFile: Failed to get mesh '%s' or shader '%s'. Skipping group.", meshName.c_str(), shaderName.c_str());
-				continue;
-			}
-
 			// 3b. Get the flat instance data arrays
 			const auto& instancesJson = groupJson["instances"];
 			const auto& idsJson = instancesJson["ids"];
-			const auto& typesJson = instancesJson["types"];
+			//const auto& typesJson = instancesJson["types"];
 			std::vector<GLfloat> positionsVec = instancesJson["positions"].get<std::vector<GLfloat>>();
 			std::vector<GLfloat> rotationsVec = instancesJson["rotations"].get<std::vector<GLfloat>>();
 			std::vector<GLfloat> scalesVec = instancesJson["scales"].get<std::vector<GLfloat>>();
 
 			// Sanity check: ensure the arrays are consistent
 			size_t instanceCount = idsJson.size();
-			assert(typesJson.size() == instanceCount);
+			//assert(typesJson.size() == instanceCount);
 			assert(positionsVec.size() == instanceCount * 3);
 			assert(rotationsVec.size() == instanceCount * 3);
 			assert(scalesVec.size() == instanceCount * 3);
 
+			if (!CMeshManager::Instance().IsMeshLoaded(meshName))
+			{
+				// Store all necessary data to create the object later
+				for (size_t i = 0; i < instanceCount; ++i)
+				{
+					SPendingObjectsData pendingData{};
+					pendingData.stMeshName = meshName;
+					pendingData.stShaderName = shaderName;
+
+					// Extract raw transform data from JSON (since pPhysicsObject isn't created yet)
+					pendingData.v3Position = SVector3Df(positionsVec[i * 3], positionsVec[i * 3 + 1], positionsVec[i * 3 + 2]);
+					pendingData.v3Rotation = SVector3Df(rotationsVec[i * 3], rotationsVec[i * 3 + 1], rotationsVec[i * 3 + 2]);
+					pendingData.v3Scale = SVector3Df(scalesVec[i * 3], scalesVec[i * 3 + 1], scalesVec[i * 3 + 2]);
+					pendingData.uiObjectID = idsJson[i];
+					// Store the physics overrides
+					if (instancesJson.contains("physics_overrides"))
+					{
+						pendingData.physicsOverrides = instancesJson["physics_overrides"];
+					}
+
+					m_vPendingObjects.push_back(pendingData);
+				}
+
+				continue; // Continue to the next render group
+			}
+
+			// If mesh or shader is NOT ready, store as pending
+			std::shared_ptr<CMesh> pMesh = CMeshManager::Instance().GetMesh(meshName);
+			CShader* pShader = CResourcesManager::Instance().GetShader(shaderName);
+			if (!pMesh || !pShader)
+			{
+				sys_err("LoadAreaObjectsFromFile::LoadAreaObjectsFromFile: Failed to get mesh '%s' or shader '%s'. Skipping group", meshName.c_str(), shaderName.c_str());
+				continue; // Continue to the next render group
+			}
+
 			// 3c. Loop through and create each object instance
 			for (size_t i = 0; i < instanceCount; ++i)
 			{
-				TObjectData newObjectData;
-
-				newObjectData.uiObjectID = idsJson[i];
-				newObjectData.eObjectType = static_cast<EObjectTypes>(typesJson[i].get<int>());
-
 				// Extract transform data from the flat arrays
 				SVector3Df pos(positionsVec[i * 3], positionsVec[i * 3 + 1], positionsVec[i * 3 + 2]);
 				SVector3Df rot(rotationsVec[i * 3], rotationsVec[i * 3 + 1], rotationsVec[i * 3 + 2]);
@@ -254,21 +311,78 @@ bool CTerrainAreaData::LoadAreaObjectsFromFile(const std::string& stAreaObjectsD
 
 				SVector3Df v3AreaOrigin = GetWorldOrigin();
 
-				newObjectData.pPhysicsObject = new CPhysicsObject();
-				newObjectData.pPhysicsObject->SetType(newObjectData.eObjectType);
-				newObjectData.pPhysicsObject->SetPosition(v3AreaOrigin + pos);
-				newObjectData.pPhysicsObject->SetRotation(rot);
-				newObjectData.pPhysicsObject->SetScale(scale);
-				newObjectData.pPhysicsObject->EnableGravity(true);
-				newObjectData.pPhysicsObject->SetTerrainMap(m_pOwnerTerrainMap);
-				newObjectData.pPhysicsObject->SetRestitution(0.9f); // 0.6 = moderately bouncy
-				// The bounding box comes from the master mesh
-				pMesh->ComputeBoundingVolumes();
-				newObjectData.pPhysicsObject->SetBoundingBoxLocal(pMesh->GetBoundingBox());;
+				auto& physics = CMeshManager::Instance().GetMeshInfo(meshName).PhysicsInfo;
 
+				CPhysicsObject* pPhysicsObject = new CPhysicsObject();
+
+				// Initialize the physics object with the mesh's physics info
+				pPhysicsObject->SetMass(physics.fMass);
+				pPhysicsObject->SetFriction(physics.fFriction); // 0.5 = moderately slippery
+				pPhysicsObject->SetRestitution(physics.fRestitution); // 0.6 = moderately bouncy
+				pPhysicsObject->SetUseGravity(physics.bUsesGravity);
+				pPhysicsObject->SetCollidable(physics.bIsCollidable);
+				pPhysicsObject->SetType(physics.ePhysicsType);
+
+				pPhysicsObject->SetTerrainMap(m_pOwnerTerrainMap);
+
+				pPhysicsObject->SetPosition(v3AreaOrigin + pos);
+				pPhysicsObject->SetRotation(rot);
+				pPhysicsObject->SetScale(scale);
+				// The bounding box comes from the master mesh
+				pPhysicsObject->SetBoundingBoxLocal(CMeshManager::Instance().GetMeshInfo(meshName).boundingBox);
+
+				// world translation
+				TObjectData newObjectData;
+
+				newObjectData.uiObjectID = idsJson[i];
+				//newObjectData.eObjectType = static_cast<EObjectTypes>(typesJson[i].get<int>());
+				newObjectData.eObjectType = physics.ePhysicsType; // Use the physics type for the object type
 				newObjectData.WorldTranslation.SetPosition(v3AreaOrigin + pos);
 				newObjectData.WorldTranslation.SetRotation(rot);
-				newObjectData.WorldTranslation.SetScale(pos);
+				newObjectData.WorldTranslation.SetScale(scale);
+
+				// Check for and apply Physics OVERRIDES 
+				if (instancesJson.contains("physics_overrides"))
+				{
+					const auto& overrides = instancesJson["physics_overrides"];
+
+					if (overrides.contains("instance_id"))
+					{
+						if (newObjectData.uiObjectID == overrides["instance_id"])
+						{
+							if (overrides.contains("mass"))
+							{
+								pPhysicsObject->SetMass(overrides["mass"].get<GLfloat>());
+							}
+							if (overrides.contains("restitution"))
+							{
+								pPhysicsObject->SetRestitution(overrides["restitution"].get<GLfloat>());
+							}
+							if (overrides.contains("friction"))
+							{
+								pPhysicsObject->SetFriction(overrides["friction"].get<GLfloat>());
+							}
+							if (overrides.contains("gravity_enabled"))
+							{
+								pPhysicsObject->SetUseGravity(overrides["gravity_enabled"].get<bool>());
+							}
+							if (overrides.contains("is_collidable"))
+							{
+								pPhysicsObject->SetCollidable(overrides["is_collidable"].get<bool>());
+							}
+							if (overrides.contains("type"))
+							{
+								pPhysicsObject->SetType(overrides["type"].get<EObjectTypes>());
+								newObjectData.eObjectType = overrides["type"].get<EObjectTypes>(); // Update the object type in the new data
+							}
+						}
+					}
+				}
+
+				pPhysicsObject->SetObjectName(pMesh->GetMeshName());
+				CPhysicsWorld::Instance().AddObject(pPhysicsObject);
+
+				newObjectData.pPhysicsObject = pPhysicsObject; // Assign the physics object to the new object data
 
 				// Use your existing AddObject function to correctly place the new object
 				// in both the master list and the correct render group.
@@ -305,9 +419,13 @@ bool CTerrainAreaData::SaveAreaObjectsFromFile(const std::string& stMapName)
 
 	for (const TObjectInstanceGroup& group : m_vObjectsGroups)
 	{
+		if (!group.pMesh)
+		{
+			continue;
+		}
+
 		nlohmann::json groupJson;
 		groupJson["name"] = group.pMesh ? group.pMesh->GetMeshName() : "Unnamed Group"; // Give it a debug name
-		groupJson["mesh"] = group.pMesh ? group.pMesh->GetMeshFilePath() : "";
 		groupJson["shader"] = group.pShader ? group.pShader->GetName() : "";
 
 		// --- Create the main "instances" object ---
@@ -315,11 +433,14 @@ bool CTerrainAreaData::SaveAreaObjectsFromFile(const std::string& stMapName)
 
 		// --- Create the flat arrays for each component ---
 		nlohmann::json idsJson = nlohmann::json::array();
-		nlohmann::json typesJson = nlohmann::json::array();
+		//nlohmann::json typesJson = nlohmann::json::array();
 		nlohmann::json positionsJson = nlohmann::json::array();
 		nlohmann::json rotationsJson = nlohmann::json::array();
 		nlohmann::json scalesJson = nlohmann::json::array();
 
+		// You can add physics overrides here if needed, e.g., instanceOverridesJson["instance_id"] = 123;
+		nlohmann::json instanceOverridesJson; // Create an empty object for all overrides in this group
+		
 		// Iterate through all objects in the group once to populate the flat arrays
 		for (const SObjectData* obj : group.vecObjects)
 		{
@@ -327,7 +448,7 @@ bool CTerrainAreaData::SaveAreaObjectsFromFile(const std::string& stMapName)
 
 			// Add data to the respective arrays
 			idsJson.push_back(obj->uiObjectID);
-			typesJson.push_back(obj->eObjectType);
+			//typesJson.push_back(obj->eObjectType);
 
 			if (obj->pPhysicsObject)
 			{
@@ -345,6 +466,44 @@ bool CTerrainAreaData::SaveAreaObjectsFromFile(const std::string& stMapName)
 				scalesJson.push_back(scale.x);
 				scalesJson.push_back(scale.y);
 				scalesJson.push_back(scale.z);
+
+				// overrtides
+				const auto& defaultPhysics = CMeshManager::Instance().GetMeshInfo(group.pMesh->GetMeshName()).PhysicsInfo;
+				CPhysicsObject* pPhysicsObject = obj->pPhysicsObject;
+				nlohmann::json currentOverrides; // A temporary object for THIS instance's overrides
+
+				// Compare each property against the default and save if different
+				if (pPhysicsObject->GetMass() != defaultPhysics.fMass)
+				{
+					currentOverrides["mass"] = pPhysicsObject->GetMass();
+				}
+				if (pPhysicsObject->GetRestitution() != defaultPhysics.fRestitution)
+				{
+					currentOverrides["restitution"] = pPhysicsObject->GetRestitution();
+				}
+				if (pPhysicsObject->GetFriction() != defaultPhysics.fFriction)
+				{
+					currentOverrides["friction"] = pPhysicsObject->GetFriction();
+				}
+				if (pPhysicsObject->UsesGravity() != defaultPhysics.bUsesGravity)
+				{
+					currentOverrides["gravity_enabled"] = pPhysicsObject->UsesGravity();
+				}
+				if (pPhysicsObject->IsCollidable() != defaultPhysics.bIsCollidable)
+				{
+					currentOverrides["is_collidable"] = pPhysicsObject->IsCollidable();
+				}
+				if (pPhysicsObject->GetType() != defaultPhysics.ePhysicsType)
+				{
+					currentOverrides["type"] = pPhysicsObject->GetType();
+				}
+
+				if (!currentOverrides.empty())
+				{
+					// Use the object's ID as the key 
+					currentOverrides["instance_id"] = obj->uiObjectID;
+					instanceOverridesJson.push_back(currentOverrides);
+				}
 			}
 			else
 			{
@@ -367,13 +526,19 @@ bool CTerrainAreaData::SaveAreaObjectsFromFile(const std::string& stMapName)
 
 		// Assign the completed flat arrays to the instances object
 		instancesJson["ids"] = idsJson;
-		instancesJson["types"] = typesJson;
+		//instancesJson["types"] = typesJson;
 		instancesJson["positions"] = positionsJson;
 		instancesJson["rotations"] = rotationsJson;
 		instancesJson["scales"] = scalesJson;
 
 		// Add the completed instances object to the group
 		groupJson["instances"] = instancesJson;
+
+		// If there are any instance overrides, add them to the group
+		if (!instanceOverridesJson.empty())
+		{
+			groupJson["physics_overrides"] = instanceOverridesJson;
+		}
 
 		// Add the completed group to the main array of groups
 		renderGroupsJson.push_back(groupJson);
@@ -406,41 +571,161 @@ std::vector<TObjectInstanceGroup>& CTerrainAreaData::GetObjectsGroups()
 	return (m_vObjectsGroups);
 }
 
-bool CTerrainAreaData::CreateObject(const std::string& meshName, const std::string& shaderName, const SVector3Df& position, const SVector3Df& rotation, const SVector3Df& scale)
-{
-	// 1. Get the required resources from the manager.
-	std::shared_ptr<CMesh> pMesh = CMeshManager::Instance().GetMesh(meshName);
-	CShader* pShader = CResourcesManager::Instance().GetShader(shaderName);
-
-	if (!pMesh || !pShader)
-	{
-		sys_err("CreateObject: Could not find mesh '%s' or shader '%s'.", meshName.c_str(), shaderName.c_str());
-		return (false);
-	}
-
-	// 2. Create the data for the new object.
-	TObjectData newObjectData;
-	newObjectData.WorldTranslation.SetPosition(position);
-	newObjectData.WorldTranslation.SetRotation(rotation);
-	newObjectData.WorldTranslation.SetScale(scale);
-	newObjectData.boundingBox = pMesh->GetBoundingBox(); // Get the correct local-space box
-	newObjectData.eObjectType = OBJECT_TYPE_STATIC; // Or whatever type is appropriate
-
-	// Generate a new unique ID. A simple approach is to use the current size of the master list.
-	// A more robust system might use a static counter.
-	// newObjectData.uiObjectID = m_vObjectsData.size() + 1;
-
-	// 3. Use your internal AddObject function to add it to the system.
-	AddObjectInstanceGroup(pShader, pMesh.get(), newObjectData);
-
-	// 4. Return a pointer to the newly created object.
-	// The object we just added will be at the back of the master list.
-	return (true);
-}
-
 SVector3Df CTerrainAreaData::GetWorldOrigin() const
 {
 	return (SVector3Df(m_iAreaCoordX * TERRAIN_XSIZE, 0, m_iAreaCoordZ * TERRAIN_ZSIZE));
+}
+
+CPhysicsObject* CTerrainAreaData::AddObject(const std::string& stMeshName, const SVector3Df& v3Position, const SVector3Df& v3Rotation, const SVector3Df& v3Scale)
+{
+	// --- 1. Get Mesh Prototype Info ---
+	const auto& meshInfo = CMeshManager::Instance().GetMeshInfo(stMeshName);
+	if (!meshInfo.pMesh)
+	{
+		sys_err("AddObject: Could not find mesh info for '%s'", stMeshName.c_str());
+		return nullptr;
+	}
+	const auto& defaultPhysics = meshInfo.PhysicsInfo;
+
+	// --- 2. Create and Configure Physics Object ---
+	CPhysicsObject* pNewPhysicsObject = new CPhysicsObject();
+	pNewPhysicsObject->SetMass(defaultPhysics.fMass);
+	pNewPhysicsObject->SetRestitution(defaultPhysics.fRestitution);
+	pNewPhysicsObject->SetFriction(defaultPhysics.fFriction);
+	pNewPhysicsObject->SetUseGravity(defaultPhysics.bUsesGravity);
+	pNewPhysicsObject->SetCollidable(defaultPhysics.bIsCollidable);
+	pNewPhysicsObject->SetType(defaultPhysics.ePhysicsType);
+	// ... other physics properties ...
+
+	pNewPhysicsObject->SetPosition(v3Position);
+	pNewPhysicsObject->SetRotation(v3Rotation);
+	pNewPhysicsObject->SetScale(v3Scale);
+	pNewPhysicsObject->SetBoundingBoxLocal(meshInfo.boundingBox);
+
+	CPhysicsWorld::Instance().AddObject(pNewPhysicsObject);
+
+	// --- 3. Create Render Data and Add to Render System ---
+	SObjectData pNewObjectData;
+	pNewObjectData.pPhysicsObject = pNewPhysicsObject;
+
+	pNewObjectData.eObjectType = pNewPhysicsObject->GetType(); // Use the physics type for the object type
+	pNewObjectData.WorldTranslation.SetPosition(v3Position);
+	pNewObjectData.WorldTranslation.SetRotation(v3Rotation);
+	pNewObjectData.WorldTranslation.SetScale(v3Scale);
+
+	CShader* pShader = CResourcesManager::Instance().GetShader("StandardInstancedModel");
+	AddObjectInstanceGroup(pShader, meshInfo.pMesh.get(), pNewObjectData);
+
+	return pNewPhysicsObject;
+}
+
+void CTerrainAreaData::UpdateAreaObjects()
+{
+	// 2. Iterate through pending objects and try to activate them, don't it++ to avoid crashes.
+	for (auto it = m_vPendingObjects.begin(); it != m_vPendingObjects.end();)
+	{
+		// Try to get the mesh again (non-blocking)
+		ELoadState loadState = CMeshManager::Instance().GetMeshLoadState(it->stMeshName);
+		if (loadState == ELoadState::LOAD_STATE_LOADED) // SUCCEEED
+		{
+			// SUCCESS: Mesh is ready.
+			std::shared_ptr<CMesh> pMesh = CMeshManager::Instance().GetMesh(it->stMeshName);
+			CShader* pShader = CResourcesManager::Instance().GetShader(it->stShaderName);
+
+			if (pMesh && pShader)
+			{
+				CreateObjectFromData(*it, pMesh, pShader);
+				// Erase from pending list and the iterator is automatically advanced.
+				it = m_vPendingObjects.erase(it);
+			}
+			else
+			{
+				// Mesh is loaded, but shader might not be. Wait.
+				it++;
+			}
+		}
+		else if (loadState == ELoadState::LOAD_STATE_FAILED) // Failed
+		{
+			// FAILURE: Mesh failed to load. Discard this pending object.
+			sys_err("UpdateAreaObjects: Discarding pending object because mesh '%s' failed to load.", it->stMeshName.c_str());
+			it = m_vPendingObjects.erase(it);
+		}
+		else // PENDING
+		{
+			// STILL LOADING: Do nothing and move to the next item.
+			it++;
+		}
+	}
+}
+
+bool CTerrainAreaData::CreateObjectFromData(const SPendingObjectsData& pendingInfo, std::shared_ptr<CMesh> pMesh, CShader* pShader)
+{
+	// --- Create and Configure Physics Object ---
+	CPhysicsObject* pPhysicsObject = new CPhysicsObject();
+	const auto& physicsInfo = CMeshManager::Instance().GetMeshInfo(pendingInfo.stMeshName).PhysicsInfo;
+
+	// Set default properties from prototype
+	pPhysicsObject->SetMass(physicsInfo.fMass);
+	pPhysicsObject->SetFriction(physicsInfo.fFriction); // 0.5 = moderately slippery
+	pPhysicsObject->SetRestitution(physicsInfo.fRestitution); // 0.6 = moderately bouncy
+	pPhysicsObject->SetUseGravity(physicsInfo.bUsesGravity);
+	pPhysicsObject->SetCollidable(physicsInfo.bIsCollidable);
+	pPhysicsObject->SetType(physicsInfo.ePhysicsType);
+
+	pPhysicsObject->SetPosition(GetWorldOrigin() + pendingInfo.v3Position);
+	pPhysicsObject->SetRotation(pendingInfo.v3Rotation);
+	pPhysicsObject->SetScale(pendingInfo.v3Scale);
+	pPhysicsObject->SetBoundingBoxLocal(CMeshManager::Instance().GetMeshInfo(pendingInfo.stMeshName).boundingBox);
+	pPhysicsObject->SetObjectName(pMesh->GetMeshName());
+	pPhysicsObject->SetTerrainMap(m_pOwnerTerrainMap);
+
+	// --- Apply Physics Overrides ---
+	// This logic is now much cleaner. We assume pendingInfo.physicsOverrides is the correct data.
+	if (!pendingInfo.physicsOverrides.empty())
+	{
+		for (const auto& overrideEntry : pendingInfo.physicsOverrides)
+		{
+			if (overrideEntry.contains("instance_id") && overrideEntry.at("instance_id").get<GLuint>() == pendingInfo.uiObjectID)
+			{
+				if (overrideEntry.contains("mass"))
+				{
+					pPhysicsObject->SetMass(overrideEntry["mass"].get<GLfloat>());
+				}
+				if (overrideEntry.contains("restitution"))
+				{
+					pPhysicsObject->SetRestitution(overrideEntry["restitution"].get<GLfloat>());
+				}
+				if (overrideEntry.contains("friction"))
+				{
+					pPhysicsObject->SetFriction(overrideEntry["friction"].get<GLfloat>());
+				}
+				if (overrideEntry.contains("gravity_enabled"))
+				{
+					pPhysicsObject->SetUseGravity(overrideEntry["gravity_enabled"].get<bool>());
+				}
+				if (overrideEntry.contains("is_collidable"))
+				{
+					pPhysicsObject->SetCollidable(overrideEntry["is_collidable"].get<bool>());
+				}
+				if (overrideEntry.contains("type"))
+				{
+					pPhysicsObject->SetType(overrideEntry["type"].get<EObjectTypes>());
+				}
+			}
+		}
+	}
+
+	CPhysicsWorld::Instance().AddObject(pPhysicsObject);
+
+	// --- Create Render Data ---
+	TObjectData newObjectData;
+	newObjectData.uiObjectID = pendingInfo.uiObjectID;
+	newObjectData.eObjectType = pPhysicsObject->GetType();
+	newObjectData.pPhysicsObject = pPhysicsObject;
+
+	AddObjectInstanceGroup(pShader, pMesh.get(), newObjectData);
+
+	return (true);
 }
 
 void CTerrainAreaData::DestroySystem()

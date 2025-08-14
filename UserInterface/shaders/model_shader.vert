@@ -5,8 +5,8 @@ layout (location = 1) in vec3 m_v3Normals;
 layout (location = 2) in vec2 m_v2TexCoord;
 
 // Per-instance attributes (assuming you set up the attribute pointers for these)
-layout (location = 3) in mat4 aInstanceWVP;   // Your WVP_MAT_BUFFER
-layout (location = 7) in mat4 aInstanceWorld; // Your WORLD_MAT_BUFFER
+layout (location = 3) in mat4 aInstanceWorld; // Your WORLD_MAT_BUFFER
+layout (location = 7) in mat4 aInstanceWVP;   // Your WVP_MAT_BUFFER
 
 out vec3 v3WorldPos;
 out vec3 v3Normals;

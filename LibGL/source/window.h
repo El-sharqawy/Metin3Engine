@@ -56,6 +56,9 @@ public:
 	CTerrainManager* GetTerrainManager();
 	CSkyBox* GetSkyBox() { return m_pSkyBox; }
 
+	void SetWireFrame(bool bIsWireFrame);
+	bool IsWireFrame() const { return m_bIsWireFrame; }
+
 protected:
 	void Destroy();
 
@@ -69,10 +72,15 @@ protected:
 	static size_t GetCurrentCPUMemoryUsage();
 	static void PrintGPUMemoryUsage_AMD();
 
-	static GLuint m_uiRandSeed;
-
 	void InitializeClasses();
+
 	void UpdateRenderUI();
+	void UpdateScreen();
+	void UpdateRenderSkyBox();
+	void UpdateRenderTerrain(GLfloat fDeltaTime);
+	void UpdateRenderWindow();
+
+	void CheckMouseButtons();
 
 public: // Singleton Classes
 	CCameraManager camera_manager;
@@ -86,13 +94,25 @@ private:
 	GLuint m_uiHeight;
 	std::string m_stWindowName;
 	bool m_bIsFullScreen;
-	bool m_bIsMouseFocusedIn;
 	bool m_bIsWireFrame;
-	std::array<bool, 2> m_bMouseState;
 	std::array<bool, 1024> m_bKeyBools;
 	CCamera* m_pCamera;
 	GLfloat m_fBrushInterval;	// Time interval in seconds for brush application
 	GLfloat m_fBrushTimer;		// Timer to track elapsed time
+
+	GLuint m_uiRandSeed;
+
+	// new way to handle mouse state
+	bool m_bIsMouseFocusedIn;
+	bool m_bLeftMousePressed;
+	bool m_bRightMousePressed;
+
+	// new way to handle mouse position / scroll
+	bool m_bFirstMouse;
+	GLfloat m_fLastMouseX;
+	GLfloat m_fLastMouseY;
+	GLfloat m_fMouseScrollY; // Vertical scroll
+	bool m_bMouseScrollUpdate;
 
 private:
 	// Class Pointers Members

@@ -1,36 +1,81 @@
 #include "Stdafx.h"
 #include "Mesh.h"
-#include "PhysicsObject.h"
-#include "BoundingBox.h"
+#include "MeshTexture.h"
 #include <meshoptimizer/meshoptimizer.h>
-#include "../../LibMath/source/vectors.h"
-#include "MeshManager.h"
 
+/**
+ * CMesh - Constructor
+ *
+ * Initializes a new CMesh instance with default values.
+ */
 CMesh::CMesh()
 {
+	Clear();
+}
+
+/**
+ * ~CMesh - Destructor
+ *
+ * Cleans up resources used by the CMesh instance.
+ */
+CMesh::~CMesh()
+{
+	Clear();
+}
+
+/**
+ * Clear - Cleans up resources used by the CMesh instance.
+ */
+void CMesh::Clear()
+{
 	m_pScene = nullptr;
-	m_pPhysicsObject = nullptr;
-	m_matGlobalInverseTransform.InitIdentity();
+	m_vVertices.clear();
+	m_vIndices.clear();
+	m_vMeshes.clear();
+
+	for (auto& material : m_vMaterials)
+	{
+		safe_delete(material.m_pDiffuseMap);
+		safe_delete(material.m_pSpecularMap);
+		safe_delete(material.m_sPBRMaterial.m_pAlbedo);
+		safe_delete(material.m_sPBRMaterial.m_pMetallic);
+		safe_delete(material.m_sPBRMaterial.m_pRoughness);
+	}
+
+	m_vMaterials.clear(); // Now it's safe to clear the vector
+
+	m_vMaterials.clear();
 	m_bIsPBR = false;
-	m_bNeedsUpdate = false;
+	m_matGlobalInverseTransform.InitIdentity();
+	m_stMeshFilePath.clear();
+	m_stMeshName.clear();
 	m_iIndexCount = 0; // Number of indices in the mesh
 	m_iVertexCount = 0; // Number of vertices in the mesh
 	m_iIndexOffset = 0;
 	m_iVertexOffset = 0;
 }
 
-CMesh::~CMesh()
-{
-	Clear();
-}
-
+/**
+ * LoadMesh - Loads a 3D model from a file using Assimp.
+ *
+ * This function reads the scene data from the specified file, processes it,
+ * and initializes the mesh and material data.
+ *
+ * This function clears any previously loaded mesh data before loading the new mesh.
+ *
+ * @param stFileName: The path to the mesh file.
+ * @param bIsUVFlipped: Optional flag to flip texture coordinates vertically.
+ * 
+ * @return True if the mesh is loaded successfully, false otherwise.
+ */
 bool CMesh::LoadMesh(const std::string& stFileName, bool bIsUVFlipped)
 {
 	// Release the previously loaded mesh (if it exists)
 	Clear();
 
-	bool bRet = false;
+	bool bLoaded = false;
 
+	// Read the file using Assimp
 	if (bIsUVFlipped)
 	{
 		m_pScene = m_Importer.ReadFile(stFileName.c_str(), ASSIMP_LOAD_FLAGS | aiProcess_FlipUVs);
@@ -40,16 +85,21 @@ bool CMesh::LoadMesh(const std::string& stFileName, bool bIsUVFlipped)
 		m_pScene = m_Importer.ReadFile(stFileName.c_str(), ASSIMP_LOAD_FLAGS);
 	}
 
-	if (m_pScene)
-	{
-		m_matGlobalInverseTransform = m_pScene->mRootNode->mTransformation;
-		m_matGlobalInverseTransform = m_matGlobalInverseTransform.Inverse();
-		bRet = InitFromScene(m_pScene, stFileName);
-	}
-	else
+	m_stMeshFilePath = stFileName;
+
+	// Check if the scene was loaded successfully
+	if (!m_pScene)
 	{
 		sys_err("CMesh::LoadMesh Error parsing '%s': '%s'", stFileName.c_str(), m_Importer.GetErrorString());
+		return (bLoaded);
 	}
+
+	// Set the global inverse transform matrix
+	m_matGlobalInverseTransform = m_pScene->mRootNode->mTransformation;
+	m_matGlobalInverseTransform = m_matGlobalInverseTransform.Inverse();
+
+	// Initialize the mesh data from the scene
+	bLoaded = LoadMeshData();
 
 	// Make sure the VAO is not changed from the outside
 	if (!IsGLVersionHigher(4, 5))
@@ -57,228 +107,112 @@ bool CMesh::LoadMesh(const std::string& stFileName, bool bIsUVFlipped)
 		glBindVertexArray(0);
 	}
 
-	m_pPhysicsObject = new CPhysicsObject;
-
-	SetMeshFilePath(stFileName);
-
-	return (bRet);
+	// return loading mesh state
+	return (bLoaded);
 }
 
-void CMesh::Render(GLuint uiVAO)
+/**
+ * LoadMeshData - Processes the loaded Assimp scene data.
+ *
+ * This function orchestrates the conversion of Assimp's data structures
+ * into the engine's internal vertex and index formats.
+ *
+ * @return True on success, false otherwise.
+ */
+bool CMesh::LoadMeshData()
 {
-	if (IsPBR())
+	// resize the vectors to hold the mesh and material data
+	m_vMeshes.resize(m_pScene->mNumMeshes);
+	m_vMaterials.resize(m_pScene->mNumMaterials);
+
+	GLuint uiNumVertices = 0;
+	GLuint uiNumIndices = 0;
+
+	// Calculate offsets for sub-meshes.
+	ConvertVerticesAndIndices(uiNumVertices, uiNumIndices);
+
+	// Pre-allocate memory for vertices and indices
+	ReserveSpace(uiNumVertices, uiNumIndices);
+
+	// Initialize all sub-meshes from the loaded Assimp scene
+	InitSubMeshes();
+
+	if (!InitMaterials())
 	{
-		SetupRenderMaterialsPBR();
+		sys_err("CMesh::LoadMeshData: Failed to Initialize Materials");
+		return (false);
 	}
 
-	glBindVertexArray(uiVAO);
+	return (true);
+}
 
-	for (GLuint uiMeshIndex = 0; uiMeshIndex < m_vMeshes.size(); ++uiMeshIndex)
+/**
+ * ConvertVerticesAndIndices - Calculates offsets for sub-meshes.
+ * 
+ * Iterates through the Assimp mesh data to determine the starting index
+ * and vertex for each sub-mesh, which is essential for rendering.
+ *
+ * @param uiNumVertices: (Output) Total number of vertices in the scene.
+ * @param uiNumIndices: (Output) Total number of indices in the scene.
+ */
+void CMesh::ConvertVerticesAndIndices(GLuint& uiNumVertices, GLuint& uiNumIndices)
+{
+	for (size_t i = 0; i < m_vMeshes.size(); i++)
 	{
-		const GLuint uiMaterialIndex = m_vMeshes[uiMeshIndex].uiMaterialIndex;
-		ASSERT(uiMaterialIndex < m_vMaterials.size(), "Check Mesh Materials");
+		m_vMeshes[i].uiMaterialIndex = m_pScene->mMeshes[i]->mMaterialIndex;
+		m_vMeshes[i].uiNumIndices = m_pScene->mMeshes[i]->mNumFaces * 3;
+		m_vMeshes[i].uiBaseVertex = uiNumVertices;
+		m_vMeshes[i].uiBaseIndex = uiNumIndices;
 
-		if (!IsPBR())
-		{
-			SetupRenderMaterialsPhong(uiMeshIndex, uiMaterialIndex);
-		}
-
-		glDrawElementsBaseVertex(GL_TRIANGLES,
-			m_vMeshes[uiMeshIndex].uiNumIndices,
-			GL_UNSIGNED_INT,
-			(void*)(sizeof(unsigned int) * m_vMeshes[uiMeshIndex].uiBaseIndex),
-			m_vMeshes[uiMeshIndex].uiBaseVertex);
-
-	}
-
-	// Make sure the VAO is not changed from the outside
-	glBindVertexArray(0);
-}
-
-const TMaterial& CMesh::GetMaterial()
-{
-	for (size_t i = 0; i < m_vMaterials.size(); i++)
-	{
-		if (m_vMaterials[i].m_v4AmbientColor != SVector4Df(0.0f))
-		{
-			return (m_vMaterials[i]);
-		}
-	}
-
-	if (m_vMaterials.size() == 0)
-	{
-		sys_err("CMesh::GetMaterial No materials found in the mesh");
-		exit(0);
-	}
-	return (m_vMaterials[0]);
-}
-
-TPBRMaterial& CMesh::GetPBRMaterial()
-{
-	if (m_vMaterials.size() == 0)
-	{
-		sys_err("CMesh::GetPBRMaterial No PBRMaterial found in the mesh");
-		exit(0);
-	}
-
-	return (m_vMaterials[0].m_sPBRMaterial);
-}
-
-void CMesh::GetLeadingVertex(GLuint uiDrawIndex, GLuint uiPrimID, SVector3Df& Vertex)
-{
-	GLuint uiMeshIndex = uiDrawIndex; // Each mesh is rendered in its own draw call
-
-	ASSERT(uiMeshIndex < m_pScene->mNumMeshes, "Check Model Meshes Number");
-	const aiMesh* pMesh = m_pScene->mMeshes[uiMeshIndex];
-
-	ASSERT(uiPrimID < pMesh->mNumFaces, "Check Mesh Faces Number");
-	const aiFace& rFace = pMesh->mFaces[uiPrimID];
-
-	GLuint uiLeadingIndex = rFace.mIndices[0];
-	ASSERT(uiLeadingIndex < pMesh->mNumVertices, "Number of Face Indices bigger than mesh vertices");
-
-	const aiVector3D& vec3Vertices = pMesh->mVertices[uiLeadingIndex];
-	Vertex.x = vec3Vertices.x;
-	Vertex.y = vec3Vertices.y;
-	Vertex.z = vec3Vertices.z;
-}
-
-void CMesh::SetPBR(bool bIsPBR)
-{
-	m_bIsPBR = bIsPBR;
-}
-
-bool CMesh::IsPBR() const
-{
-	return (m_bIsPBR);
-}
-
-void CMesh::AttachPhysicsObject(CPhysicsObject* pPhysics)
-{
-	m_pPhysicsObject = pPhysics;
-}
-
-CPhysicsObject* CMesh::GetPhysicsObject()
-{
-	return (m_pPhysicsObject);
-}
-
-void CMesh::Update(GLfloat fDeltaTime)
-{
-	if (m_pPhysicsObject != nullptr)
-	{
-		GetPhysicsObject()->Update(fDeltaTime);
-	}
-
-	if (m_bNeedsUpdate)
-	{
-		ComputeBoundingVolumes();
+		uiNumVertices += m_pScene->mMeshes[i]->mNumVertices;
+		uiNumIndices += m_vMeshes[i].uiNumIndices;
 	}
 }
 
-const SVector3Df& CMesh::GetPosition() const
-{
-	return (m_pPhysicsObject->GetPosition());
-
-}
-
-void CMesh::SetPosition(const SVector3Df& v3Pos)
-{
-	m_pPhysicsObject->SetPosition(v3Pos);
-	m_bNeedsUpdate = true; // Mark for bounding volume update
-}
-
-const SVector3Df& CMesh::GetRotation() const
-{
-	return (m_pPhysicsObject->GetRotation());
-}
-
-void CMesh::SetRotation(const SVector3Df& v3Rot)
-{
-	m_pPhysicsObject->SetRotation(v3Rot);
-	m_bNeedsUpdate = true; // Mark for bounding volume update
-}
-
-const SVector3Df& CMesh::GetScale() const
-{
-	return (m_pPhysicsObject->GetScale());
-}
-
-void CMesh::SetScale(const SVector3Df& v3Scale)
-{
-	 m_pPhysicsObject->SetScale(v3Scale);
-	 m_bNeedsUpdate = true; // Mark for bounding volume update
-}
-
-const CWorldTranslation& CMesh::GetWorldTranslation() const
-{
-	return (m_pPhysicsObject->GetWorldTranslation());
-}
-
-void CMesh::SetWorldTranslation(const CWorldTranslation& worldT)
-{
-	m_pPhysicsObject->SetWorldTranslation(worldT);
-}
-
-void CMesh::ComputeBoundingVolumes()
-{
-	if (m_vVertices.empty())
-		return;
-
-	// 1. Compute AABB
-	SVector3Df min{};
-	SVector3Df max{};
-
-	for (auto& vertex : m_vVertices)
-	{
-		const SVector3Df pos = SVector3Df(vertex.v3Pos.x, vertex.v3Pos.y, vertex.v3Pos.z);
-		min.x = MyMath::fmin(min.x, pos.x);
-		min.y = MyMath::fmin(min.y, pos.y);
-		min.z = MyMath::fmin(min.z, pos.z);
-
-		max.x = MyMath::fmax(max.x, pos.x);
-		max.y = MyMath::fmax(max.y, pos.y);
-		max.z = MyMath::fmax(max.z, pos.z);
-	}
-
-	m_MeshBoundBoxLocal.v3Min = min;
-	m_MeshBoundBoxLocal.v3Max = max;
-
-	// 2. Compute bounding sphere (center = AABB center, radius = max distance)
-	SVector3Df center = (min + max) * 0.5f;
-	float maxRadiusSq = 0.0f;
-
-	for (auto& vertex : m_vVertices) {
-		SVector3Df pos = SVector3Df(vertex.v3Pos.x, vertex.v3Pos.y, vertex.v3Pos.z);
-		float distSq = pos.distance(center);
-		maxRadiusSq = MyMath::fmax(maxRadiusSq, distSq);
-	}
-
-	m_MeshBoundSphere.v3Center = center;
-	m_MeshBoundSphere.fRadius = sqrt(maxRadiusSq);
-
-	//m_MeshBoundBoxLocal = m_MeshBoundBoxLocal.Transform(GetWorldTranslation().GetMatrix());
-}
-
-TBoundingBox& CMesh::GetBoundingBox()
-{
-	return (m_MeshBoundBoxLocal);
-}
-
-// Protected Members
-
-void CMesh::Clear()
-{
-	safe_delete(m_pPhysicsObject);
-}
-
+/**
+ * ReserveSpace - Pre-allocates memory for vertices and indices.
+ * 
+ * This function helps prevent frequent reallocations when populating
+ * the vertex and index vectors, improving loading performance.
+ *
+ * @param uiNumVertices: The total number of vertices to reserve space for.
+ * @param uiNumIndices: The total number of indices to reserve space for.
+ */
 void CMesh::ReserveSpace(GLuint uiNumVertices, GLuint uiNumIndices)
 {
 	m_vVertices.reserve(uiNumVertices);
 	m_vIndices.reserve(uiNumIndices);
 }
 
-void CMesh::InitSingleMesh(const aiMesh* pMesh)
+/**
+ * InitSubMeshes - Initializes all sub-meshes from the loaded Assimp scene.
+ *
+ * This function iterates through each mesh in the Assimp scene and calls
+ * the appropriate initialization function (optimized or standard)
+ * to populate the vertex and index buffers.
+ */
+void CMesh::InitSubMeshes()
+{
+	for (GLuint i = 0; i < m_pScene->mNumMeshes; i++)
+	{
+		const aiMesh* pMesh = m_pScene->mMeshes[i];
+#if defined(USE_MESH_OPRIMIZER)
+		InitMeshOptimized(i, pMesh);
+#else
+		InitMesh(pMesh);
+#endif
+	}
+}
+
+/**
+ * InitMesh - Initializes a single sub-mesh from Assimp data.
+ * 
+ * Populates the vertex and index vectors with data from the provided
+ * aiMesh without performing any optimizations.
+ *
+ * @param pMesh: A pointer to the Assimp mesh structure to process.
+ */
+void CMesh::InitMesh(const aiMesh* pMesh)
 {
 	const aiVector3D ZeroVec(0.0f, 0.0f, 0.0f);
 
@@ -287,22 +221,21 @@ void CMesh::InitSingleMesh(const aiMesh* pMesh)
 
 	for (GLuint i = 0; i < pMesh->mNumVertices; i++)
 	{
-		const aiVector3D& vPos = pMesh->mVertices[i];
-		vertex.v3Pos = SVector3Df(vPos.x, vPos.y, vPos.z);
+		const aiVector3D& v3Pos = pMesh->mVertices[i];
+		vertex.v3Pos = SVector3Df(v3Pos.x, v3Pos.y, v3Pos.z);
 
 		if (pMesh->mNormals)
 		{
-			const aiVector3D& vNormals = pMesh->mNormals[i];
-			vertex.v3Normals = SVector3Df(vNormals.x, vNormals.y, vNormals.z);
+			const aiVector3D& v3Normals = pMesh->mNormals[i];
+			vertex.v3Normals = SVector3Df(v3Normals.x, v3Normals.y, v3Normals.z);
 		}
 		else
 		{
-			aiVector3D vNormals(0.0f, 1.0f, 0.0f);
-			vertex.v3Normals = SVector3Df(vNormals.x, vNormals.y, vNormals.z);
+			vertex.v3Normals = SVector3Df(0.0f, 1.0f, 0.0f);
 		}
 
-		const aiVector3D& vTexCoords = pMesh->HasTextureCoords(0) ? pMesh->mTextureCoords[0][i] : ZeroVec;
-		vertex.v2Texture = SVector2Df(vTexCoords.x, vTexCoords.y);
+		const aiVector3D& v3TexCoords = pMesh->HasTextureCoords(0) ? pMesh->mTextureCoords[0][i] : ZeroVec;
+		vertex.v2Texture = SVector2Df(v3TexCoords.x, v3TexCoords.y);
 
 		m_vVertices.emplace_back(vertex);
 	}
@@ -317,189 +250,152 @@ void CMesh::InitSingleMesh(const aiMesh* pMesh)
 	}
 }
 
-void CMesh::InitSingleMeshOptimized(GLuint uiMeshIndex, const aiMesh* pMesh)
+/**
+ * InitMeshOptimized - Initializes and prepares a sub-mesh for optimization.
+ * 
+ * Extracts vertex and index data and then passes it to the
+ * OptimizeMesh function to perform performance optimizations.
+ * 
+ * @param uiMeshIndex: The index of this sub-mesh in the main mesh array.
+ * @param pMesh: A pointer to the Assimp mesh structure to process.
+ */
+void CMesh::InitMeshOptimized(GLuint uiMeshIndex, const aiMesh* pMesh)
 {
 	const aiVector3D ZeroVec(0.0f, 0.0f, 0.0f);
 
 	// Populate the vertex attribute vectors
 	TMeshVertex vertex{};
-	std::vector<TMeshVertex> vecVertices(pMesh->mNumVertices);
+
+	std::vector<TMeshVertex> vecVertices;
 
 	for (GLuint i = 0; i < pMesh->mNumVertices; i++)
 	{
-		const aiVector3D& vPos = pMesh->mVertices[i];
-		vertex.v3Pos = SVector3Df(vPos.x, vPos.y, vPos.z);
+		const aiVector3D& v3Pos = pMesh->mVertices[i];
+		vertex.v3Pos = SVector3Df(v3Pos.x, v3Pos.y, v3Pos.z);
 
 		if (pMesh->mNormals)
 		{
-			const aiVector3D& vNormals = pMesh->mNormals[i];
-			vertex.v3Normals = SVector3Df(vNormals.x, vNormals.y, vNormals.z);
+			const aiVector3D& v3Normals = pMesh->mNormals[i];
+			vertex.v3Normals = SVector3Df(v3Normals.x, v3Normals.y, v3Normals.z);
 		}
 		else
 		{
-			aiVector3D vNormals(0.0f, 1.0f, 0.0f);
-			vertex.v3Normals = SVector3Df(vNormals.x, vNormals.y, vNormals.z);
+			vertex.v3Normals = SVector3Df(0.0f, 1.0f, 0.0f);
 		}
 
-		const aiVector3D& vTexCoords = pMesh->HasTextureCoords(0) ? pMesh->mTextureCoords[0][i] : ZeroVec;
-		vertex.v2Texture = SVector2Df(vTexCoords.x, vTexCoords.y);
+		const aiVector3D& v3TexCoords = pMesh->HasTextureCoords(0) ? pMesh->mTextureCoords[0][i] : ZeroVec;
+		vertex.v2Texture = SVector2Df(v3TexCoords.x, v3TexCoords.y);
 
-		vecVertices[i] = vertex;
+		vecVertices.emplace_back(vertex);
 	}
 
-	m_vMeshes[uiMeshIndex].uiBaseVertex = static_cast<GLuint>(m_vVertices.size());
 	m_vMeshes[uiMeshIndex].uiBaseIndex = static_cast<GLuint>(m_vIndices.size());
+	m_vMeshes[uiMeshIndex].uiBaseVertex = static_cast<GLuint>(m_vVertices.size());
 
 	GLint iNumIndices = pMesh->mNumFaces * 3;
-	
-	std::vector<GLuint> vecIndicies;
-	vecIndicies.resize(iNumIndices);
+
+	std::vector<GLuint> vecIndices;
+	vecIndices.resize(iNumIndices);
 
 	// Populate the index buffer
 	for (GLuint i = 0; i < pMesh->mNumFaces; i++)
 	{
 		const aiFace& rFace = pMesh->mFaces[i];
-		vecIndicies[i * 3 + 0] = rFace.mIndices[0];
-		vecIndicies[i * 3 + 1] = rFace.mIndices[1];
-		vecIndicies[i * 3 + 2] = rFace.mIndices[2];
+		vecIndices[i * 3 + 0] = rFace.mIndices[0];
+		vecIndices[i * 3 + 1] = rFace.mIndices[1];
+		vecIndices[i * 3 + 2] = rFace.mIndices[2];
 	}
 
-	OptimizeMesh(uiMeshIndex, vecVertices, vecIndicies);
+	// Optimize Mesh Data
+	OptimizeMesh(uiMeshIndex, vecVertices, vecIndices);
 }
 
-// Priave Members
-
-bool CMesh::InitFromScene(const aiScene* pScene, const std::string& stFileName)
-{
-	m_vMeshes.resize(pScene->mNumMeshes);
-	m_vMaterials.resize(pScene->mNumMaterials);
-
-	GLuint uiNumVertices = 0;
-	GLuint uiNumIndices = 0;
-
-	ConvertVerticesAndIndices(pScene, uiNumVertices, uiNumIndices);
-	ReserveSpace(uiNumVertices, uiNumIndices);
-	InitAllMeshes(pScene);
-
-	if (!InitMaterials(pScene, stFileName))
-	{
-		sys_err("CMesh::InitFromScene: Failed to Initialize Materials");
-		return false;
-	}
-
-	//PopulateBuffers();
-
-	return GLCheckError();
-}
-
-void CMesh::ConvertVerticesAndIndices(const aiScene* pScene, GLuint& uiNumVertices, GLuint& uiNumIndices)
-{
-	for (size_t i = 0; i < m_vMeshes.size(); i++)
-	{
-		m_vMeshes[i].uiMaterialIndex = pScene->mMeshes[i]->mMaterialIndex;
-		m_vMeshes[i].uiNumIndices = pScene->mMeshes[i]->mNumFaces * 3;
-		m_vMeshes[i].uiBaseVertex = uiNumVertices;
-		m_vMeshes[i].uiBaseIndex = uiNumIndices;
-
-		uiNumVertices += pScene->mMeshes[i]->mNumVertices;
-		uiNumIndices += m_vMeshes[i].uiNumIndices;
-	}
-}
-
-void CMesh::InitAllMeshes(const aiScene* pScene)
-{
-	for (GLuint i = 0; i < m_vMeshes.size(); i++)
-	{
-		const aiMesh* pMesh = pScene->mMeshes[i];
-#if defined(USE_MESH_OPRIMIZER)
-		InitSingleMeshOptimized(i, pMesh);
-#else
-		InitSingleMesh(pMesh);
-#endif
-	}
-}
-
+/**
+ * OptimizeMesh - Optimizes mesh data for rendering performance.
+ * 
+ * This function uses the meshoptimizer library to perform several
+ * optimizations: removing duplicate vertices, improving vertex cache
+ * locality, optimizing for vertex fetch efficiency, and simplifying the mesh.
+ *
+ * @param iMeshIndex: The index of the sub-mesh being optimized.
+ * @param vVertices: A vector of vertices for the sub-mesh.
+ * @param vIndices: A vector of indices for the sub-mesh.
+ */
 void CMesh::OptimizeMesh(GLint iMeshIndex, std::vector<TMeshVertex>& vVertices, std::vector<GLuint>& vIndices)
 {
 	size_t NumVertices = vVertices.size();
 	size_t NumIndices = vIndices.size();
 
-	// Create a remap table
+	// Create a remap table to find unique vertices
 	std::vector<GLuint> remapVec(NumIndices);
-	
+
 	// Generate Optimized Vertices
 	size_t OptimizedVertexCount = meshopt_generateVertexRemap(remapVec.data(),	// dest addr
-		vIndices.data(),	// Indices Src
-		NumIndices,		// and Indices size
-		vVertices.data(),	// Vertices Src
-		NumVertices,		// and Vertices size
+		vIndices.data(),		// Indices Src
+		NumIndices,				// and Indices size
+		vVertices.data(),		// Vertices Src
+		NumVertices,			// and Vertices size
 		sizeof(TMeshVertex)		// stride
-		);
+	);
 
-	// Allocate a local index/vertex arrays
-	std::vector<GLuint> optimizedIndicesVec;
-	std::vector<TMeshVertex> optimizedVerticesVec;
+	// Allocate vectors for optimized data
+	std::vector<TMeshVertex> optimizedVerticesVec(OptimizedVertexCount);
+	std::vector<GLuint> optimizedIndicesVec(NumIndices);
 
-	// Resize it to our new Size
-	optimizedVerticesVec.resize(OptimizedVertexCount);
-	optimizedIndicesVec.resize(NumIndices);
-
-	// Optimization #1: remove duplicate vertices
-	meshopt_remapIndexBuffer(optimizedIndicesVec.data(), vIndices.data(), NumIndices, remapVec.data());
+	// Optimization #1: Remap the buffers to remove duplicate vertices
 	meshopt_remapVertexBuffer(optimizedVerticesVec.data(), vVertices.data(), NumVertices, sizeof(TMeshVertex), remapVec.data());
+	meshopt_remapIndexBuffer(optimizedIndicesVec.data(), vIndices.data(), NumIndices, remapVec.data());
 
-	// Optimization #2: improve the locality of the vertices
+	// Optimization #2: Optimize for vertex cache and fetch efficiency
 	meshopt_optimizeVertexCache(optimizedIndicesVec.data(), optimizedIndicesVec.data(), NumIndices, OptimizedVertexCount);
-
-	// Optimization #3: reduce pixel overdraw
-	meshopt_optimizeOverdraw(optimizedIndicesVec.data(), optimizedIndicesVec.data(), NumIndices, &(optimizedVerticesVec[0].v3Pos.x), OptimizedVertexCount, sizeof(TMeshVertex), 1.05f);
-
-	// Optimization #4: optimize access to the vertex buffer
 	meshopt_optimizeVertexFetch(optimizedVerticesVec.data(), optimizedIndicesVec.data(), NumIndices, optimizedVerticesVec.data(), OptimizedVertexCount, sizeof(TMeshVertex));
 
-	// Optimization #5: create a simplified version of the model
+	// Optimization #3: Create a simplified version of the model
 	float fThreshHold = 1.0f;
 	size_t TargetIndexCount = static_cast<size_t>(NumIndices * fThreshHold);
 
+	// Set the target error for simplification
 	float fTargetError = 0.0f;
 
+	// Create a vector to hold the simplified indices
 	std::vector<GLuint> SimplifiedIndiciesVec(optimizedIndicesVec.size());
 
+	// Simplify the mesh
 	size_t OptimizedIndicesCount = meshopt_simplify(SimplifiedIndiciesVec.data(), optimizedIndicesVec.data(), NumIndices,
 		&(optimizedVerticesVec[0].v3Pos.x), OptimizedVertexCount, sizeof(TMeshVertex), TargetIndexCount, fTargetError);
 
-	static GLint iNumIndices = 0;
-	iNumIndices += static_cast<GLint>(NumIndices);
-
-	static GLint iOptimizedIndices = 0;
-	iOptimizedIndices += static_cast<GLint>(OptimizedIndicesCount);
+	// Log the number of indices before and after optimization
+	const GLint iNumIndices = static_cast<GLint>(NumIndices);
+	const GLint iOptimizedIndices = static_cast<GLint>(OptimizedIndicesCount);
 
 #if defined(ENABLE_MESH_LOGS)
-	sys_log("CMesh::OptimizeMesh Num indices %d\n", iNumIndices);
-	sys_log("CMesh::OptimizeMesh Optimized number of indices %d\n", iOptimizedIndices);
+	sys_log("CMesh::OptimizeMesh Num indices %d", iNumIndices);
+	sys_log("CMesh::OptimizeMesh Optimized number of indices %d", iOptimizedIndices);
 #endif
 
+	// Resize the simplified indices vector to the optimized count
 	SimplifiedIndiciesVec.resize(OptimizedIndicesCount);
 
-	// Concatenate the local arrays into the class attributes arrays
+	// Append the final, optimized data to the main mesh buffers
 	m_vIndices.insert(m_vIndices.end(), SimplifiedIndiciesVec.begin(), SimplifiedIndiciesVec.end());
 	m_vVertices.insert(m_vVertices.end(), optimizedVerticesVec.begin(), optimizedVerticesVec.end());
 
+	// Update the sub-mesh's final index count
 	m_vMeshes[iMeshIndex].uiNumIndices = static_cast<GLuint>(OptimizedIndicesCount);
 }
 
-bool CMesh::InitMaterials(const aiScene* pScene, const std::string& stFileName)
+bool CMesh::InitMaterials()
 {
-	std::string stDir = GetDirFromFilename(stFileName);
+	std::string stDir = GetDirFromFilename(m_stMeshFilePath);
 
 #if defined(ENABLE_MESH_LOGS)
-	sys_log("CMesh::InitMaterials Num materials: %d", pScene->mNumMaterials);
+	sys_log("CMesh::InitMaterials Num materials: %d", m_pScene->mNumMaterials);
 #endif
 
 	// Initialize the materials
-	for (GLuint i = 0; i < pScene->mNumMaterials; i++)
+	for (GLuint i = 0; i < m_pScene->mNumMaterials; i++)
 	{
-		const aiMaterial* pMat = pScene->mMaterials[i];
+		const aiMaterial* pMat = m_pScene->mMaterials[i];
 		LoadTextures(stDir, pMat, i);
 		LoadColors(pMat, i);
 	}
@@ -522,7 +418,7 @@ void CMesh::LoadDiffuseTexture(const std::string& stDirectory, const aiMaterial*
 {
 	m_vMaterials[iMaterialIndex].m_pDiffuseMap = nullptr;
 
-	if (pMaterial->GetTextureCount(aiTextureType_DIFFUSE) > 0) 
+	if (pMaterial->GetTextureCount(aiTextureType_DIFFUSE) > 0)
 	{
 		aiString stPath;
 
@@ -544,9 +440,9 @@ void CMesh::LoadDiffuseTexture(const std::string& stDirectory, const aiMaterial*
 
 void CMesh::LoadDiffuseTextureEmbeded(const aiTexture* pTexture, GLint iMaterialIndex)
 {
-	m_vMaterials[iMaterialIndex].m_pDiffuseMap = new CTexture(GL_TEXTURE_2D);
+	m_vMaterials[iMaterialIndex].m_pDiffuseMap = new CMeshTexture2D(GL_TEXTURE_2D);
 	GLint iBufferSize = pTexture->mWidth;
-	m_vMaterials[iMaterialIndex].m_pDiffuseMap->Load(iBufferSize, pTexture->pcData);
+	m_vMaterials[iMaterialIndex].m_pDiffuseMap->LoadTextureFromMemory(iBufferSize, pTexture->pcData);
 
 #if defined(ENABLE_MESH_LOGS)
 	sys_log("CMesh::LoadDiffuseTextureEmbeded Loaded a Diffuse Texture Type %s", pTexture->achFormatHint);
@@ -556,8 +452,8 @@ void CMesh::LoadDiffuseTextureEmbeded(const aiTexture* pTexture, GLint iMaterial
 void CMesh::LoadDiffuseTextureFromFile(const std::string& stDirectory, const aiString& stPath, GLint iMaterialIndex)
 {
 	std::string stFullPath = GetFullPath(stDirectory, stPath);
-	m_vMaterials[iMaterialIndex].m_pDiffuseMap = new CTexture(stFullPath.c_str(), GL_TEXTURE_2D);
-	if (!m_vMaterials[iMaterialIndex].m_pDiffuseMap->Load())
+	m_vMaterials[iMaterialIndex].m_pDiffuseMap = new CMeshTexture2D(stFullPath.c_str(), GL_TEXTURE_2D);
+	if (!m_vMaterials[iMaterialIndex].m_pDiffuseMap->LoadTexture())
 	{
 		sys_err("CMesh::LoadDiffuseTextureFromFile Failed to Load a Diffuse Texture %s", stFullPath.c_str());
 		return;
@@ -594,9 +490,9 @@ void CMesh::LoadSpecularTexture(const std::string& stDirectory, const aiMaterial
 
 void CMesh::LoadSpecularTextureEmbeded(const aiTexture* pTexture, GLint iMaterialIndex)
 {
-	m_vMaterials[iMaterialIndex].m_pSpecularMap = new CTexture(GL_TEXTURE_2D);
+	m_vMaterials[iMaterialIndex].m_pSpecularMap = new CMeshTexture2D(GL_TEXTURE_2D);
 	GLint iBufferSize = pTexture->mWidth;
-	m_vMaterials[iMaterialIndex].m_pSpecularMap->Load(iBufferSize, pTexture->pcData);
+	m_vMaterials[iMaterialIndex].m_pSpecularMap->LoadTextureFromMemory(iBufferSize, pTexture->pcData);
 
 #if defined(ENABLE_MESH_LOGS)
 	sys_log("CMesh::LoadSpecularTextureEmbeded Loaded a Specular Texture Type %s", pTexture->achFormatHint);
@@ -606,8 +502,8 @@ void CMesh::LoadSpecularTextureEmbeded(const aiTexture* pTexture, GLint iMateria
 void CMesh::LoadSpecularTextureFromFile(const std::string& stDirectory, const aiString& stPath, GLint iMaterialIndex)
 {
 	std::string stFullPath = GetFullPath(stDirectory, stPath);
-	m_vMaterials[iMaterialIndex].m_pSpecularMap = new CTexture(stFullPath.c_str(), GL_TEXTURE_2D);
-	if (!m_vMaterials[iMaterialIndex].m_pSpecularMap->Load())
+	m_vMaterials[iMaterialIndex].m_pSpecularMap = new CMeshTexture2D(stFullPath.c_str(), GL_TEXTURE_2D);
+	if (!m_vMaterials[iMaterialIndex].m_pSpecularMap->LoadTexture())
 	{
 		sys_err("CMesh::LoadSpecularTextureFromFile Failed to Load a Specular Texture %s", stFullPath.c_str());
 		return;
@@ -644,9 +540,9 @@ void CMesh::LoadAlbedoTexture(const std::string& stDirectory, const aiMaterial* 
 
 void CMesh::LoadAlbedoTextureEmbeded(const aiTexture* pTexture, GLint iMaterialIndex)
 {
-	m_vMaterials[iMaterialIndex].m_sPBRMaterial.m_pAlbedo = new CTexture(GL_TEXTURE_2D);
+	m_vMaterials[iMaterialIndex].m_sPBRMaterial.m_pAlbedo = new CMeshTexture2D(GL_TEXTURE_2D);
 	GLint iBufferSize = pTexture->mWidth;
-	m_vMaterials[iMaterialIndex].m_sPBRMaterial.m_pAlbedo->Load(iBufferSize, pTexture->pcData);
+	m_vMaterials[iMaterialIndex].m_sPBRMaterial.m_pAlbedo->LoadTextureFromMemory(iBufferSize, pTexture->pcData);
 
 #if defined(ENABLE_MESH_LOGS)
 	sys_log("CMesh::LoadAlbedoTextureEmbeded Loaded an Albedo Texture Type %s", pTexture->achFormatHint);
@@ -656,8 +552,8 @@ void CMesh::LoadAlbedoTextureEmbeded(const aiTexture* pTexture, GLint iMaterialI
 void CMesh::LoadAlbedoTextureFromFile(const std::string& stDirectory, const aiString& stPath, GLint iMaterialIndex)
 {
 	std::string stFullPath = GetFullPath(stDirectory, stPath);
-	m_vMaterials[iMaterialIndex].m_sPBRMaterial.m_pAlbedo = new CTexture(stFullPath.c_str(), GL_TEXTURE_2D);
-	if (!m_vMaterials[iMaterialIndex].m_sPBRMaterial.m_pAlbedo->Load())
+	m_vMaterials[iMaterialIndex].m_sPBRMaterial.m_pAlbedo = new CMeshTexture2D(stFullPath.c_str(), GL_TEXTURE_2D);
+	if (!m_vMaterials[iMaterialIndex].m_sPBRMaterial.m_pAlbedo->LoadTexture())
 	{
 		sys_err("CMesh::LoadAlbedoTextureFromFile Failed to Load an Albedo Texture %s", stFullPath.c_str());
 		return;
@@ -694,9 +590,9 @@ void CMesh::LoadMetalnessTexture(const std::string& stDirectory, const aiMateria
 
 void CMesh::LoadMetalnessTextureEmbeded(const aiTexture* pTexture, GLint iMaterialIndex)
 {
-	m_vMaterials[iMaterialIndex].m_sPBRMaterial.m_pMetallic = new CTexture(GL_TEXTURE_2D);
+	m_vMaterials[iMaterialIndex].m_sPBRMaterial.m_pMetallic = new CMeshTexture2D(GL_TEXTURE_2D);
 	GLint iBufferSize = pTexture->mWidth;
-	m_vMaterials[iMaterialIndex].m_sPBRMaterial.m_pMetallic->Load(iBufferSize, pTexture->pcData);
+	m_vMaterials[iMaterialIndex].m_sPBRMaterial.m_pMetallic->LoadTextureFromMemory(iBufferSize, pTexture->pcData);
 
 #if defined(ENABLE_MESH_LOGS)
 	sys_log("CMesh::LoadMetalnessTextureEmbeded Loaded a Metallic Texture Type %s", pTexture->achFormatHint);
@@ -706,8 +602,8 @@ void CMesh::LoadMetalnessTextureEmbeded(const aiTexture* pTexture, GLint iMateri
 void CMesh::LoadMetalnessTextureFromFile(const std::string& stDirectory, const aiString& stPath, GLint iMaterialIndex)
 {
 	std::string stFullPath = GetFullPath(stDirectory, stPath);
-	m_vMaterials[iMaterialIndex].m_sPBRMaterial.m_pMetallic = new CTexture(stFullPath.c_str(), GL_TEXTURE_2D);
-	if (!m_vMaterials[iMaterialIndex].m_sPBRMaterial.m_pMetallic->Load())
+	m_vMaterials[iMaterialIndex].m_sPBRMaterial.m_pMetallic = new CMeshTexture2D(stFullPath.c_str(), GL_TEXTURE_2D);
+	if (!m_vMaterials[iMaterialIndex].m_sPBRMaterial.m_pMetallic->LoadTexture())
 	{
 		sys_err("CMesh::LoadMetalnessTextureFromFile Failed to Load a Metallic Texture %s", stFullPath.c_str());
 		return;
@@ -744,9 +640,9 @@ void CMesh::LoadRoughnessTexture(const std::string& stDirectory, const aiMateria
 
 void CMesh::LoadRoughnessTextureEmbeded(const aiTexture* pTexture, GLint iMaterialIndex)
 {
-	m_vMaterials[iMaterialIndex].m_sPBRMaterial.m_pRoughness = new CTexture(GL_TEXTURE_2D);
+	m_vMaterials[iMaterialIndex].m_sPBRMaterial.m_pRoughness = new CMeshTexture2D(GL_TEXTURE_2D);
 	GLint iBufferSize = pTexture->mWidth;
-	m_vMaterials[iMaterialIndex].m_sPBRMaterial.m_pRoughness->Load(iBufferSize, pTexture->pcData);
+	m_vMaterials[iMaterialIndex].m_sPBRMaterial.m_pRoughness->LoadTextureFromMemory(iBufferSize, pTexture->pcData);
 
 #if defined(ENABLE_MESH_LOGS)
 	sys_log("CMesh::LoadRoughnessTextureEmbeded Loaded a Diffuse Roughness Texture Type %s", pTexture->achFormatHint);
@@ -756,8 +652,8 @@ void CMesh::LoadRoughnessTextureEmbeded(const aiTexture* pTexture, GLint iMateri
 void CMesh::LoadRoughnessTextureFromFile(const std::string& stDirectory, const aiString& stPath, GLint iMaterialIndex)
 {
 	std::string stFullPath = GetFullPath(stDirectory, stPath);
-	m_vMaterials[iMaterialIndex].m_sPBRMaterial.m_pRoughness = new CTexture(stFullPath.c_str(), GL_TEXTURE_2D);
-	if (!m_vMaterials[iMaterialIndex].m_sPBRMaterial.m_pRoughness->Load())
+	m_vMaterials[iMaterialIndex].m_sPBRMaterial.m_pRoughness = new CMeshTexture2D(stFullPath.c_str(), GL_TEXTURE_2D);
+	if (!m_vMaterials[iMaterialIndex].m_sPBRMaterial.m_pRoughness->LoadTexture())
 	{
 		sys_err("CMesh::LoadRoughnessTextureFromFile Failed to Load a Diffuse Roughness Texture %s", stFullPath.c_str());
 		return;
@@ -770,9 +666,7 @@ void CMesh::LoadRoughnessTextureFromFile(const std::string& stDirectory, const a
 
 void CMesh::LoadColors(const aiMaterial* pMaterial, GLint iMaterialIndex)
 {
-	aiColor4D AmbientColor(0.0f, 0.0f, 0.0f, 0.0f);
-	SVector4Df vecAllOne(1.0f);
-
+	SVector4Df v4OneVec(1.0f, 1.0f, 1.0f, 1.0f);
 	GLint iShadingModel = 0;
 
 	if (pMaterial->Get(AI_MATKEY_SHADING_MODEL, iShadingModel) == AI_SUCCESS)
@@ -782,6 +676,7 @@ void CMesh::LoadColors(const aiMaterial* pMaterial, GLint iMaterialIndex)
 #endif
 	}
 
+	aiColor3D AmbientColor(0.0f, 0.0f, 0.0f);
 	if (pMaterial->Get(AI_MATKEY_COLOR_AMBIENT, AmbientColor) == AI_SUCCESS)
 	{
 #if defined(ENABLE_MESH_LOGS)
@@ -793,7 +688,7 @@ void CMesh::LoadColors(const aiMaterial* pMaterial, GLint iMaterialIndex)
 	}
 	else
 	{
-		m_vMaterials[iMaterialIndex].m_v4AmbientColor = vecAllOne;
+		m_vMaterials[iMaterialIndex].m_v4AmbientColor = v4OneVec;
 	}
 
 	aiColor3D DiffuseColor(0.0f, 0.0f, 0.0f);
@@ -808,7 +703,7 @@ void CMesh::LoadColors(const aiMaterial* pMaterial, GLint iMaterialIndex)
 	}
 
 	aiColor3D SpecularColor(0.0f, 0.0f, 0.0f);
-	if (pMaterial->Get(AI_MATKEY_COLOR_DIFFUSE, SpecularColor) == AI_SUCCESS)
+	if (pMaterial->Get(AI_MATKEY_COLOR_SPECULAR, SpecularColor) == AI_SUCCESS)
 	{
 #if defined(ENABLE_MESH_LOGS)
 		sys_log("CMesh::LoadColors Loaded Specular Color(%f, %f, %f)", SpecularColor.r, SpecularColor.g, SpecularColor.b);
@@ -819,41 +714,100 @@ void CMesh::LoadColors(const aiMaterial* pMaterial, GLint iMaterialIndex)
 	}
 }
 
-void CMesh::SetupRenderMaterialsPBR()
+const TMaterial& CMesh::GetMaterial()
 {
-	GLint iPBRMaterialIndex = 0;
-
-	if (m_vMaterials[iPBRMaterialIndex].m_sPBRMaterial.m_pAlbedo)
+	for (size_t i = 0; i < m_vMaterials.size(); i++)
 	{
-		m_vMaterials[iPBRMaterialIndex].m_sPBRMaterial.m_pAlbedo->Bind(ALBEDO_TEXTURE_UNIT);
+		if (m_vMaterials[i].m_v4AmbientColor != SVector4Df(0.0f))
+		{
+			return (m_vMaterials[i]);
+		}
 	}
 
-	if (m_vMaterials[iPBRMaterialIndex].m_sPBRMaterial.m_pRoughness)
+	if (m_vMaterials.size() == 0)
 	{
-		m_vMaterials[iPBRMaterialIndex].m_sPBRMaterial.m_pRoughness->Bind(ROUGHNESS_TEXTURE_UNIT);
+		sys_err("CMesh::GetMaterial No materials found in the mesh");
+		exit(0);
 	}
-
-	if (m_vMaterials[iPBRMaterialIndex].m_sPBRMaterial.m_pMetallic)
-	{
-		m_vMaterials[iPBRMaterialIndex].m_sPBRMaterial.m_pMetallic->Bind(METALLIC_TEXTURE_UNIT);
-	}
-
-	if (m_vMaterials[iPBRMaterialIndex].m_sPBRMaterial.m_pNormalMap)
-	{
-		m_vMaterials[iPBRMaterialIndex].m_sPBRMaterial.m_pNormalMap->Bind(NORMAL_TEXTURE_UNIT);
-	}
-
+	return (m_vMaterials[0]);
 }
 
-void CMesh::SetupRenderMaterialsPhong(GLuint uiMeshIndex, GLuint uiMaterialIndex)
+const TPBRMaterial& CMesh::GetPBRMaterial()
 {
-	if (m_vMaterials[uiMaterialIndex].m_pDiffuseMap)
+	if (m_vMaterials.size() == 0)
 	{
-		m_vMaterials[uiMaterialIndex].m_pDiffuseMap->Bind(COLOR_TEXTURE_UNIT);
+		sys_err("CMesh::GetPBRMaterial No PBRMaterial found in the mesh");
+		exit(0);
 	}
 
-	if (m_vMaterials[uiMaterialIndex].m_pSpecularMap)
+	return (m_vMaterials[0].m_sPBRMaterial);
+}
+
+void CMesh::ComputeBoundingVolumes()
+{
+	if (m_vVertices.empty())
+		return;
+
+	// 1. Compute AABB
+	SVector3Df min{};
+	SVector3Df max{};
+
+	for (auto& vertex : m_vVertices)
 	{
-		m_vMaterials[uiMaterialIndex].m_pSpecularMap->Bind(SPECULAR_EXPONENT_UNIT);
+		const SVector3Df pos = SVector3Df(vertex.v3Pos.x, vertex.v3Pos.y, vertex.v3Pos.z);
+		min.x = MyMath::fmin(min.x, pos.x);
+		min.y = MyMath::fmin(min.y, pos.y);
+		min.z = MyMath::fmin(min.z, pos.z);
+
+		max.x = MyMath::fmax(max.x, pos.x);
+		max.y = MyMath::fmax(max.y, pos.y);
+		max.z = MyMath::fmax(max.z, pos.z);
+	}
+
+	m_MeshBoundBoxLocal.v3Min = min;
+	m_MeshBoundBoxLocal.v3Max = max;
+
+	// 2. Compute bounding sphere (center = AABB center, radius = max distance)
+	SVector3Df center = (min + max) * 0.5f;
+	float maxRadiusSq = 0.0f;
+
+	for (auto& vertex : m_vVertices) {
+		SVector3Df pos = SVector3Df(vertex.v3Pos.x, vertex.v3Pos.y, vertex.v3Pos.z);
+		float distSq = pos.distance(center);
+		maxRadiusSq = MyMath::fmax(maxRadiusSq, distSq);
+	}
+
+	//m_MeshBoundSphere.v3Center = center;
+	//m_MeshBoundSphere.fRadius = sqrt(maxRadiusSq);
+
+	//m_MeshBoundBoxLocal = m_MeshBoundBoxLocal.Transform(GetWorldTranslation().GetMatrix());
+}
+
+void CMesh::GenerateMaterialsGLState()
+{
+	for (GLuint iMaterialIndex = 0; iMaterialIndex < m_pScene->mNumMaterials; iMaterialIndex++)
+	{
+		if (m_vMaterials[iMaterialIndex].m_pDiffuseMap)
+		{
+			m_vMaterials[iMaterialIndex].m_pDiffuseMap->GenerateGLState();
+		}
+		if (m_vMaterials[iMaterialIndex].m_pSpecularMap)
+		{
+			m_vMaterials[iMaterialIndex].m_pSpecularMap->GenerateGLState();
+		}
+
+		// PBR Textures
+		if (m_vMaterials[iMaterialIndex].m_sPBRMaterial.m_pAlbedo)
+		{
+			m_vMaterials[iMaterialIndex].m_sPBRMaterial.m_pAlbedo->GenerateGLState();
+		}
+		if (m_vMaterials[iMaterialIndex].m_sPBRMaterial.m_pMetallic)
+		{
+			m_vMaterials[iMaterialIndex].m_sPBRMaterial.m_pMetallic->GenerateGLState();
+		}
+		if (m_vMaterials[iMaterialIndex].m_sPBRMaterial.m_pRoughness)
+		{
+			m_vMaterials[iMaterialIndex].m_sPBRMaterial.m_pRoughness->GenerateGLState();
+		}
 	}
 }

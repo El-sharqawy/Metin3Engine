@@ -233,7 +233,7 @@ void CTexture::LoadInternalDSA(void* pImageData)
 		case 1:
 			glTextureStorage2D(m_uiTextureID, iLevels, GL_R8, m_iWidth, m_iHeight);
 			glTextureSubImage2D(m_uiTextureID, 0, 0, 0, m_iWidth, m_iHeight, GL_RED, GL_UNSIGNED_BYTE, pImageData);
-			glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA, SwizzleMask);
+			glTextureParameteriv(m_uiTextureID, GL_TEXTURE_SWIZZLE_RGBA, SwizzleMask);
 			break;
 
 		case 2:

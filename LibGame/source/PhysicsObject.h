@@ -116,6 +116,15 @@ public:
 	// launch your object at a specific angle and speed
 	void Launch(GLfloat fSpeed, GLfloat fElevationDeg, GLfloat fAzimuthDeg = 0.0f);
 
+	// new getter method for the cached matrix
+	const CMatrix4Df& GetWorldMatrix();
+
+	const std::string& GetObjectName() const;
+	void SetObjectName(const std::string& stObjectName);
+
+	const std::string& GetTypeName();
+	void SetTypeName(const std::string& stTypeName);
+
 private:
 	CWorldTranslation m_WorldTranslation;	// World Translation of the object (position, scale, rotation, height)
 	SVector3Df m_v3Velocity;				// Velocity vector
@@ -145,4 +154,12 @@ private:
 	bool m_bSelectedObject;					// Is the object selected in the editor or game
 
 	GLint64 m_lObjectID;					// Unique ID for the object, can be used for selection or identification
+
+	CMatrix4Df m_m4WorldMatrix;				// Cached world matrix for rendering and physics calculations
+
+	bool m_bIsTransformDirty;				// This flag tracks if the matrix needs to be recalculated
+
+	std::string m_stObjectName;				// Name of the object, useful for debugging or identification
+
+	std::string m_stTypeName;				// Name of the object type, useful for debugging or identification
 };

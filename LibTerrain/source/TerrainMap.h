@@ -4,6 +4,11 @@
 #include "../../LibGL/source/shader.h"
 #include "../../LibGL/source/screen.h"
 
+class CPhysicsObject;
+class CTerrainAreaData;
+class CFrameBuffer;
+class CTexture;
+
 enum EMapOutdoorData
 {
 	TERRAIN_LOAD_SIZE = 1,
@@ -28,6 +33,7 @@ public:
 
 	bool LoadMap(const SVector3Df& v3PlayerPos);
 	bool UpdateMap(const SVector3Df& v3PlayerPos);
+	void UpdateMapAreas();
 
 	void Render(GLfloat fDeltaTime);
 
@@ -47,11 +53,14 @@ public:
 
 	// Area Data Getters
 	bool GetAreaPtr(GLint iAreaNum, CTerrainAreaData** ppAreaData);
+	bool GetAreaNum(GLfloat fX, GLfloat fZ, GLint* piAreaNum);
+	bool GetAreaNumByCoord(GLint iAreaCoordX, GLint iAreaCoordZ, GLint* AreaNum);
 
 	// Terrain Data Getters
 	bool GetTerrainPtr(GLint iTerrainNum, CTerrain** ppTerrain);
 	bool GetTerrainNum(GLfloat fX, GLfloat fZ, GLint* piTerrainNum);
 	bool GetTerrainNumByCoord(GLint iTerrainCoordX, GLint iTerrainCoordZ, GLint* piTerrainNum);
+
 	GLfloat GetTerrainHeight(GLfloat fX, GLfloat fZ);
 	GLfloat GetHeight(GLfloat fX, GLfloat fZ);
 
@@ -75,7 +84,6 @@ public:
 	CFrameBuffer* GetRefractionFBOPtr();
 	CFrameBuffer& GetReflectionFBORef();
 	CFrameBuffer& GetRefractionFBORef();
-
 
 protected:
 	void InitializeMapShaders();
@@ -122,6 +130,9 @@ public:
 	GLint GetBrushMaxSize() const;
 
 	void ReloadTextures();
+
+	// Objects part
+	CPhysicsObject* PlaceObjectAt(const std::string& stMeshName, const SVector3Df& v3Position);
 
 protected:
 	// Map Variables

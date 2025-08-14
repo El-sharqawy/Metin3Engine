@@ -264,6 +264,11 @@ CMatrix4Df CCamera::GetMatrix() const
 	return (CameraTransformation);
 }
 
+CMatrix4Df CCamera::GetProjectionMat() const
+{
+	return (m_matProj);
+}
+
 CMatrix4Df CCamera::GetViewProjMatrix() const
 {
 	CMatrix4Df viewMat = GetMatrix();
@@ -563,11 +568,6 @@ const float CCamera::GetSensitivity() const
 void CCamera::SetSensitivity(const float fVal)
 {
 	m_fSensitivity = fVal;
-}
-
-const CMatrix4Df& CCamera::GetProjectionMat() const
-{
-	return (m_matProj);
 }
 
 const SPersProjInfo& CCamera::GetPersProjInfo() const

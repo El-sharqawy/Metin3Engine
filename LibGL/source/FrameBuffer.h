@@ -77,6 +77,7 @@ public:
 	bool Initialize(GLint iWidth, GLint iHeight);
 	void BindForWriting();
 	void BindTextureForReading(GLenum eTextureUnit);
+	void UnBindWriting();
 
 private:
 	GLint m_iWidth;

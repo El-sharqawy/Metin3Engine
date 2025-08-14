@@ -14,9 +14,6 @@
 #include "../../LibGame/source/PhysicsObject.h"
 #include "../../UserInterface/source/Userinterface.h"
 
-static CWindow* appWnd = nullptr;
-GLuint CWindow::m_uiRandSeed = 0;
-
 CWindow::CWindow()
 {
 	m_uiWidth = DEFAULT_WINDOW_WIDTH;
@@ -27,17 +24,8 @@ CWindow::CWindow()
 
 	m_bKeyBools = { false };
 
-	if (appWnd)
-	{
-		printf("appWnd already initialized\n");
-		exit(1);
-	}
-	appWnd = this;
-
 	m_pCamera = CCameraManager::Instance().GetCurrentCamera();
-	m_bMouseState.at(0) = GLFW_RELEASE;
-	m_bMouseState.at(1) = GLFW_RELEASE;
-	m_bIsMouseFocusedIn = true;
+
 	m_fBrushInterval = 0.5f;
 	m_fBrushTimer = 0.0f;
 #if defined(_WIN64)
@@ -52,6 +40,16 @@ CWindow::CWindow()
 	m_pSkyBox = nullptr;
 	m_pScreenSpaceShader = nullptr;
 	m_pUserInterface = nullptr;
+
+	m_bIsMouseFocusedIn = false;
+	m_bLeftMousePressed = false;
+	m_bRightMousePressed = false;
+
+	m_bFirstMouse = true;
+	m_fLastMouseX = 0.0f;
+	m_fLastMouseY = 0.0f;
+	m_fMouseScrollY = 0.0f; // Vertical scroll
+	m_bMouseScrollUpdate = false;
 }
 
 CWindow::CWindow(const std::string& stTitle, const GLuint& width, const GLuint& height, const bool& bIsFullScreen)
@@ -64,17 +62,8 @@ CWindow::CWindow(const std::string& stTitle, const GLuint& width, const GLuint& 
 
 	m_bKeyBools = { false };
 
-	if (appWnd)
-	{
-		printf("appWnd already initialized\n");
-		exit(1);
-	}
-	appWnd = this;
-
 	m_pCamera = CCameraManager::Instance().GetCurrentCamera();
-	m_bMouseState.at(0) = GLFW_RELEASE;
-	m_bMouseState.at(1) = GLFW_RELEASE;
-	m_bIsMouseFocusedIn = true;
+
 	m_fBrushInterval = 0.5f;
 	m_fBrushTimer = 0.0f;
 #if defined(_WIN64)
@@ -82,6 +71,7 @@ CWindow::CWindow(const std::string& stTitle, const GLuint& width, const GLuint& 
 #else
 	m_uiRandSeed = getpid();
 #endif
+
 	m_pWindow = nullptr;
 	m_pFrameBufObj = nullptr;
 	m_pScreen = nullptr;
@@ -89,6 +79,16 @@ CWindow::CWindow(const std::string& stTitle, const GLuint& width, const GLuint& 
 	m_pSkyBox = nullptr;
 	m_pScreenSpaceShader = nullptr;
 	m_pUserInterface = nullptr;
+
+	m_bIsMouseFocusedIn = false;
+	m_bLeftMousePressed = false;
+	m_bRightMousePressed = false;
+
+	m_bFirstMouse = true;
+	m_fLastMouseX = 0.0f;
+	m_fLastMouseY = 0.0f;
+	m_fMouseScrollY = 0.0f; // Vertical scroll
+	m_bMouseScrollUpdate = false;
 
 	InitializeWindow(stTitle, width, height, bIsFullScreen);
 }
@@ -136,6 +136,7 @@ bool CWindow::InitializeWindow(const std::string& stTitle, const GLuint& width, 
 	}
 
 	glfwMakeContextCurrent(m_pWindow);
+	glfwSetWindowUserPointer(m_pWindow, this);
 
 	if (!InitializeGLAD())
 	{
@@ -159,14 +160,18 @@ bool CWindow::InitializeWindow(const std::string& stTitle, const GLuint& width, 
 	//glDebugMessageCallback(message_callback, nullptr);
 	glDebugMessageCallback(MyDebugCallback, nullptr);
 
-
 	m_bIsMouseFocusedIn = true;
-	m_bMouseState.at(0) = GLFW_RELEASE;
-	m_bMouseState.at(1) = GLFW_RELEASE;
 
 	if (m_bIsMouseFocusedIn)
 	{
 		glfwSetInputMode(m_pWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+	}
+
+	if (m_bFirstMouse)
+	{
+		m_fLastMouseX = GetWidth() / 2.0f;
+		m_fLastMouseY = GetHeight() / 2.0f;
+		m_bFirstMouse = false;
 	}
 
 	InitializeClasses();
@@ -213,7 +218,13 @@ GLFWwindow* CWindow::GetWindow()
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
 void CWindow::framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
-	appWnd->ResizeWindow(width, height);
+	CWindow* appWindow = (CWindow*)glfwGetWindowUserPointer(window);
+	if (!appWindow)
+	{
+		return;
+	}
+
+	appWindow->ResizeWindow(width, height);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glViewport(0, 0, width, height);
@@ -221,84 +232,90 @@ void CWindow::framebuffer_size_callback(GLFWwindow* window, int width, int heigh
 
 void CWindow::mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 {
-	if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS)
+	CWindow* appWindow = (CWindow*)glfwGetWindowUserPointer(window);
+	if (!appWindow)
 	{
-		if (appWnd->m_bIsMouseFocusedIn)
-		{
-			glfwSetInputMode(appWnd->GetWindow(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-			appWnd->m_bIsMouseFocusedIn = false;
-			appWnd->GetCamera()->SetLock(true);
-		}
-		else
-		{
-			glfwSetInputMode(appWnd->GetWindow(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-			appWnd->m_bIsMouseFocusedIn = true;
-			appWnd->GetCamera()->SetLock(false);
-		}
+		return;
 	}
 
 	if (button == GLFW_MOUSE_BUTTON_LEFT)
 	{
-		if (action == GLFW_PRESS || action == GLFW_REPEAT)
-		{
-			if (appWnd->m_pTerrainManager->IsEditingTerrain())
-			{
-				appWnd->m_pTerrainManager->UpdateEditing();
-			}
-			else if (appWnd->m_pTerrainManager->IsPickingObjects())
-			{
-				appWnd->m_pTerrainManager->PickObject(appWnd->m_pScreen->GetCRay());
-			}
-		}
+		appWindow->m_bLeftMousePressed = (action == GLFW_PRESS || action == GLFW_REPEAT);
+	}
+	else if (button == GLFW_MOUSE_BUTTON_RIGHT)
+	{
+		appWindow->m_bRightMousePressed = (action == GLFW_PRESS || action == GLFW_REPEAT);
 	}
 }
 
 void CWindow::mouse_callback(GLFWwindow* window, double xpos, double ypos)
 {
-	if (appWnd->GetCamera())
+	// Store the raw mouse position.
+	CWindow* appWindow = (CWindow*)glfwGetWindowUserPointer(window);
+	if (!appWindow)
 	{
-		appWnd->GetCamera()->ProcessMouseMovement(static_cast<float>(xpos), static_cast<float>(ypos));
+		return;
 	}
+
+	appWindow->m_fLastMouseX = static_cast<float>(xpos);
+	appWindow->m_fLastMouseY = static_cast<float>(ypos);
 }
 
 void CWindow::scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
-	if (appWnd->GetCamera())
+	CWindow* appWindow = (CWindow*)glfwGetWindowUserPointer(window);
+	if (!appWindow)
 	{
-		appWnd->GetCamera()->ProcessMouseScroll(static_cast<float>(yoffset));
+		return;
 	}
+
+	appWindow->m_fMouseScrollY = static_cast<float>(yoffset);
+	appWindow->m_bMouseScrollUpdate = true;
 }
 
 void CWindow::ProcessInput(float deltaTime)
 {
-	m_fBrushTimer += deltaTime;
-
-	if (glfwGetKey(m_pWindow, GLFW_KEY_W))
+	if (m_bKeyBools[GLFW_KEY_W])
 	{
 		GetCamera()->ProcessKeyboardInput(DIRECTION_FORWARD, deltaTime);
 	}
-	if (glfwGetKey(m_pWindow, GLFW_KEY_S))
+	if (m_bKeyBools[GLFW_KEY_S])
 	{
 		GetCamera()->ProcessKeyboardInput(DIRECTION_BACKWARD, deltaTime);
 	}
-	if (glfwGetKey(m_pWindow, GLFW_KEY_D))
+	if (m_bKeyBools[GLFW_KEY_D])
 	{
 		GetCamera()->ProcessKeyboardInput(DIRECTION_RIGHT, deltaTime);
 	}
-	if (glfwGetKey(m_pWindow, GLFW_KEY_A))
+	if (m_bKeyBools[GLFW_KEY_A])
 	{
 		GetCamera()->ProcessKeyboardInput(DIRECTION_LEFT, deltaTime);
 	}
 
-	if (glfwGetMouseButton(GetWindow(), GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)
+	if (m_bKeyBools[GLFW_KEY_ESCAPE])
 	{
-		if (m_fBrushTimer >= m_fBrushInterval)
-		{
-			//CTerrainManager::Instance().ApplyTerrainBrush();
-			//CTerrainManager::Instance().DrawTexturesBrush();
-			//m_pTerrainManager->UpdateEditing();
-			m_fBrushTimer = 0.0f;  // Reset the timer after applying the brush
-		}
+		glfwSetWindowShouldClose(GetWindow(), true);
+	}
+	if (m_bKeyBools[GLFW_KEY_LEFT_SHIFT])
+	{
+		GetCamera()->SetSprinting();
+	}
+	if (m_bKeyBools[GLFW_KEY_LEFT_CONTROL])
+	{
+		SetWireFrame(!m_bIsWireFrame);
+	}
+	if (m_bKeyBools[GLFW_KEY_F5])
+	{
+		GetTerrainManager()->SaveMap();
+	}
+	if (m_bKeyBools[GLFW_KEY_F1])
+	{
+		GetCurrentCPUMemoryUsage();
+		PrintGPUMemoryUsage_AMD();
+	}
+	if (m_bKeyBools[GLFW_KEY_F2])
+	{
+		GetCamera()->SetLock(!GetCamera()->IsLocked());
 	}
 }
 
@@ -332,7 +349,6 @@ void CWindow::PrintGPUMemoryUsage_AMD()
 void CWindow::InitializeClasses()
 {
 	CMeshManager::Instance().LoadMeshesFromJson("resources/data/game_meshes.json");
-	CMeshManager::Instance().PopulateGlobalBuffers();
 
 	m_pTerrainManager = new CTerrainManager;
 	m_pTerrainManager->Create();
@@ -343,7 +359,7 @@ void CWindow::InitializeClasses()
 
 	m_pSkyBox = new CSkyBox(this);
 
-	m_pScreenSpaceShader = new CScreenSpaceShader("shaders/post_processing.frag");
+	m_pScreenSpaceShader = new CScreenSpaceShader();
 
 	m_pFrameBufObj = new CFrameBuffer();
 	m_pFrameBufObj->Init(GetWidth(), GetHeight());
@@ -354,50 +370,21 @@ void CWindow::InitializeClasses()
 
 void CWindow::keys_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
-	bool bHandled = true;
+	CWindow* appWindow = (CWindow*)glfwGetWindowUserPointer(window);
+	if (!appWindow)
+	{
+		return;
+	}
 
 	if (key >= 0 && key < 1024)
 	{
 		if (action == GLFW_PRESS)
-			appWnd->m_bKeyBools[key] = true;
-		else if (action == GLFW_RELEASE)
-			appWnd->m_bKeyBools[key] = false;
-	}
-
-	if (action == GLFW_PRESS)
-	{
-		switch (key)
 		{
-		case GLFW_KEY_ESCAPE:
-			glfwSetWindowShouldClose(window, true);
-			break;
-
-		case GLFW_KEY_X:
-			appWnd->GetCamera()->SetLock(!appWnd->GetCamera()->IsLocked());
-			break;
-
-		case GLFW_KEY_Y:
-			GetCurrentCPUMemoryUsage();
-			PrintGPUMemoryUsage_AMD();
-			break;
-
-		case GLFW_KEY_LEFT_SHIFT:
-			appWnd->GetCamera()->SetSprinting();
-			break;
-
-		case GLFW_KEY_F1:
-			appWnd->GetCamera()->InvertCameraPitch();
-			break;
-
-		case GLFW_KEY_F5:
-			appWnd->GetTerrainManager()->SaveMap();
-			break;
-
-		case GLFW_KEY_LEFT_CONTROL:
-			appWnd->m_bIsWireFrame = !appWnd->m_bIsWireFrame;
-			sys_log("appWnd->m_bIsWireFrame: %d", appWnd->m_bIsWireFrame);
-
-			break;
+			appWindow->m_bKeyBools[key] = true;
+		}
+		else if (action == GLFW_RELEASE)
+		{
+			appWindow->m_bKeyBools[key] = false;
 		}
 	}
 }
@@ -523,7 +510,6 @@ void CWindow::Update(GLfloat fDeltaTime)
 {
 	m_pFrameBufObj->BindForWriting();
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	//glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 
 	SVector3Df v3FogColor = GetSkyBox()->GetFogColor();
 	GLfloat clearColor[4] = { v3FogColor.x, v3FogColor.y, v3FogColor.z, 1.0f };
@@ -532,6 +518,65 @@ void CWindow::Update(GLfloat fDeltaTime)
 	// Render
 	CCameraManager::Instance().GetCurrentCamera()->OnRender();
 
+	CMeshManager::Instance().FinalizeLoadedMeshes();
+
+	// will call Update for UserInterface !
+	m_pUserInterface->Update();
+
+	if (!ImGui::GetIO().WantCaptureMouse)
+	{
+		CheckMouseButtons();
+
+		if (GetCamera())
+		{
+			// Mouse Movement Logic
+			GetCamera()->ProcessMouseMovement(m_fLastMouseX, m_fLastMouseY);
+
+			// Mouse Scroll Logic
+			if (m_bMouseScrollUpdate)
+			{
+				GetCamera()->ProcessMouseScroll(m_fMouseScrollY);
+				// Reset the scroll state after processing
+				m_fMouseScrollY = 0.0f;
+				m_bMouseScrollUpdate = false;
+			}
+		}
+
+		ProcessInput(fDeltaTime);
+
+		UpdateScreen();
+	}
+	else
+	{
+	}
+
+	// Reset mouse button state for next frame
+	m_bLeftMousePressed = false;
+	m_bRightMousePressed = false;
+
+	UpdateRenderSkyBox();
+	UpdateRenderTerrain(fDeltaTime);
+
+	m_pFrameBufObj->UnBindWriting();
+
+	// Render the screen space shader that is written to our frame buffer
+	UpdateRenderWindow();
+
+	// Must be Rendered on top of everything after everything as well
+	UpdateRenderUI();
+
+	// Swap buffers and poll events
+	WindowSwapAndBufferEvents();
+}
+
+void CWindow::UpdateRenderUI()
+{
+	// Render UI on top
+	m_pUserInterface->Render();
+}
+
+void CWindow::UpdateScreen()
+{
 	double mouseX, mouseY;
 	GLint winW, winH;
 	glfwGetCursorPos(GetWindow(), &mouseX, &mouseY);
@@ -540,30 +585,43 @@ void CWindow::Update(GLfloat fDeltaTime)
 	m_pScreen->SetCursorPosition(static_cast<GLint>(mouseX), static_cast<GLint>(mouseY), winW, winH);
 	m_pTerrainManager->UpdateEditingPoint(&m_pScreen->GetIntersectionPoint());
 
-	m_pSkyBox->Update();
-
-	ProcessInput(fDeltaTime);
-
-	if (m_pTerrainManager->IsMapReady())
+	if (m_pTerrainManager->IsPickingObjects())
 	{
-	//	m_pTerrainManager->Update();
-		m_pSkyBox->Render();
-
-		m_pScreen->Update();
-
-		if (appWnd->m_bIsWireFrame)
+		CPhysicsObject* pGrabbedObject = m_pTerrainManager->GetCurrentGrabbedObject();
+		if (pGrabbedObject)
 		{
-			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+			SVector3Df v3NewPos = SVector3Df(m_pScreen->GetIntersectionPoint().x, pGrabbedObject->GetPosition().y, m_pScreen->GetIntersectionPoint().z);
+			pGrabbedObject->SetPosition(v3NewPos);
 		}
 		else
 		{
-			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+			m_pTerrainManager->PickObject(GetScreen()->GetCRay());
 		}
+	}
+}
 
+void CWindow::UpdateRenderSkyBox()
+{
+	m_pSkyBox->Update();
+	m_pSkyBox->Render();
+}
+
+void CWindow::UpdateRenderTerrain(GLfloat fDeltaTime)
+{
+	if (m_pTerrainManager->IsMapReady())
+	{
+		m_pScreen->Update();
+
+		// Update Physics World
+		CPhysicsWorld::Instance().Update(fDeltaTime);
+
+		m_pTerrainManager->GetMapRef().UpdateMapAreas();
 		m_pTerrainManager->GetMapRef().Render(fDeltaTime);
 	}
-	m_pFrameBufObj->UnBindWriting();
+}
 
+void CWindow::UpdateRenderWindow()
+{
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	glDisable(GL_DEPTH_TEST);
 	glDisable(GL_CULL_FACE); // Ensure culling doesn’t interfere
@@ -579,18 +637,6 @@ void CWindow::Update(GLfloat fDeltaTime)
 	pScreenShader->setSampler2D("screenTexture", m_pFrameBufObj->GetTextureID(), 0);
 	pScreenShader->setSampler2D("depthTex", m_pFrameBufObj->GetDepthTextureID(), 1);
 	m_pScreenSpaceShader->Render();
-
-	UpdateRenderUI();
-
-	WindowSwapAndBufferEvents();
-}
-
-void CWindow::UpdateRenderUI()
-{
-	// will call Update for all Models!
-	m_pUserInterface->Update();
-	// Render UI on top
-	m_pUserInterface->Render();
 }
 
 CTerrainManager* CWindow::GetTerrainManager()
@@ -598,3 +644,53 @@ CTerrainManager* CWindow::GetTerrainManager()
 	return (m_pTerrainManager);
 }
 
+void CWindow::SetWireFrame(bool bIsWireFrame)
+{
+	m_bIsWireFrame = bIsWireFrame;
+}
+
+void CWindow::CheckMouseButtons()
+{
+	// Right-click to toggle mouse focus
+	if (m_bRightMousePressed)
+	{
+		if (m_bIsMouseFocusedIn)
+		{
+			glfwSetInputMode(m_pWindow, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+			m_bIsMouseFocusedIn = false;
+			GetCamera()->SetLock(true);
+		}
+		else
+		{
+			glfwSetInputMode(m_pWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+			m_bIsMouseFocusedIn = true;
+			GetCamera()->SetLock(false);
+		}
+	}
+
+	// Left-click actions
+	if (m_bLeftMousePressed)
+	{
+		if (m_pTerrainManager->IsEditingTerrain())
+		{
+			m_pTerrainManager->UpdateEditing();
+		}
+		else if (m_pTerrainManager->IsPickingObjects())
+		{
+			// Logic to grab or release an object
+			if (m_pTerrainManager->GetCurrentGrabbedObject())
+			{
+				// Release object if 'X' key is pressed
+				if (glfwGetKey(GetWindow(), GLFW_KEY_X) == GLFW_PRESS)
+				{
+					m_pTerrainManager->ReleaseObject();
+				}
+			}
+			else
+			{
+				// Grab a new object
+				m_pTerrainManager->GrabObject();
+			}
+		}
+	}
+}

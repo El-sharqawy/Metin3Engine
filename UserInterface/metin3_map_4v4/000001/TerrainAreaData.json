@@ -43,15 +43,9 @@
                     0.009999999776482582,
                     0.009999999776482582,
                     0.009999999776482582
-                ],
-                "types": [
-                    2,
-                    2,
-                    2
                 ]
             },
-            "mesh": "resources/models/test1.obj",
-            "name": "warrior_mesh",
+            "name": "soldier_mesh",
             "shader": "StandardInstancedModel"
         }
     ]

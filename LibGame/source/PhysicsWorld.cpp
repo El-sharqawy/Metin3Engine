@@ -25,7 +25,6 @@ void CPhysicsWorld::Update(GLfloat fDeltaTime)
 {
 	if (!IsUpdatePhysics())
 	{
-		sys_log("CPhysicsWorld::Update: Not Updating Physics");
 		return;
 	}
 

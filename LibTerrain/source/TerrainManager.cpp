@@ -1,6 +1,7 @@
 #include "Stdafx.h"
 #include "TerrainManager.h"
 #include "TerrainMap.h"
+#include "../../LibGame/source/ResourcesManager.h"
 
 CTerrainManager::CTerrainManager()
 {

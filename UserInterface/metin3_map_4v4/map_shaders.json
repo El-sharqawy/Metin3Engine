@@ -29,6 +29,27 @@
         "vertex": "shaders/line_shader.vert",
         "fragment": "shaders/line_shader.frag"
       }
+    },
+    {
+      "name": "SkyBox",
+      "stages": {
+        "vertex": "shaders/screen.vert",
+        "fragment": "shaders/skybox.frag"
+      }
+    },
+    {
+      "name": "ScreenSpaceShader",
+      "stages": {
+        "vertex": "shaders/screen.vert",
+        "fragment": "shaders/post_processing.frag"
+      }
+    },
+    {
+      "name": "SkyBoxShadow",
+      "stages": {
+        "vertex": "shaders/skybox_shadow.vert",
+        "fragment": "shaders/skybox_shadow.frag"
+      }
     }
   ]
 }

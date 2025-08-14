@@ -141,8 +141,10 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="source\BoundingBox.h" />
+    <ClInclude Include="source\CRC32.h" />
     <ClInclude Include="source\Mesh.h" />
     <ClInclude Include="source\MeshManager.h" />
+    <ClInclude Include="source\MeshTexture.h" />
     <ClInclude Include="source\Model.h" />
     <ClInclude Include="source\PhysicsObject.h" />
     <ClInclude Include="source\PhysicsWorld.h" />
@@ -151,10 +153,14 @@
     <ClInclude Include="source\Skybox.h" />
     <ClInclude Include="source\SpatialGrid.h" />
     <ClInclude Include="source\Stdafx.h" />
+    <ClInclude Include="source\Utils.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="source\BoundingBox.cpp" />
+    <ClCompile Include="source\CRC32.cpp" />
     <ClCompile Include="source\Mesh.cpp" />
     <ClCompile Include="source\MeshManager.cpp" />
+    <ClCompile Include="source\MeshTexture.cpp" />
     <ClCompile Include="source\Model.cpp" />
     <ClCompile Include="source\PhysicsObject.cpp" />
     <ClCompile Include="source\PhysicsWorld.cpp" />
@@ -163,6 +169,7 @@
     <ClCompile Include="source\Skybox.cpp" />
     <ClCompile Include="source\SpatialGrid.cpp" />
     <ClCompile Include="source\Stdafx.cpp" />
+    <ClCompile Include="source\Utils.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

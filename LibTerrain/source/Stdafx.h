@@ -24,4 +24,7 @@
 #include "../../LibGL/source/camera.h"
 #include "../../LibMath/source/stdafx.h"
 
+// A helper function to safely compare floats
+bool AreFloatsDifferent(GLfloat a, GLfloat b, GLfloat epsilon = 1e-5f);
+
 #endif //STDAFX_H

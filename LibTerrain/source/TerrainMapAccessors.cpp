@@ -70,6 +70,48 @@ bool CTerrainMap::GetAreaPtr(GLint iAreaNum, CTerrainAreaData** ppAreaData)
 	return (true);
 }
 
+bool CTerrainMap::GetAreaNum(GLfloat fX, GLfloat fZ, GLint* piAreaNum)
+{
+	GLfloat fTerrainXSize = TERRAIN_XSIZE;
+	GLfloat fTerrainZSize = TERRAIN_XSIZE;
+
+	// Calculate terrain grid indices based on predefined terrain tile sizes
+	GLint iAreaNumX = static_cast<GLint>(fX / fTerrainXSize); // X-axis grid index
+	GLint iAreaNumZ = static_cast<GLint>(fZ / fTerrainZSize); // Z-axis grid index
+
+	// Delegate to helper function to compute the area index
+	return (GetAreaNumByCoord(iAreaNumX, iAreaNumZ, piAreaNum));
+}
+
+bool CTerrainMap::GetAreaNumByCoord(GLint iAreaCoordX, GLint iAreaCoordZ, GLint* piTerrainNum)
+{
+	if (iAreaCoordX < 0 || iAreaCoordZ < 0 || iAreaCoordX >= m_iTerrainCountX || iAreaCoordZ >= m_iTerrainCountZ)
+	{
+		return (false);
+	}
+
+	GLint iAreaIndex = iAreaCoordZ * m_iTerrainCountX + iAreaCoordX;
+
+	if (iAreaIndex >= m_vLoadedAreas.size())
+	{
+		return (false);
+	}
+
+	if (!m_vLoadedAreas[iAreaIndex])
+	{
+		return (false);
+	}
+
+	if (iAreaIndex >= 0 && iAreaIndex < m_vLoadedAreas.size())
+	{
+		*piTerrainNum = iAreaIndex;
+		return (true);
+	}
+
+	return (false);
+}
+
+
 bool CTerrainMap::GetTerrainPtr(GLint iTerrainNum, CTerrain** ppTerrain)
 {
 	if (iTerrainNum > m_vLoadedTerrains.size())
@@ -128,6 +170,7 @@ bool CTerrainMap::GetTerrainNumByCoord(GLint iTerrainCoordX, GLint iTerrainCoord
 
 	return (false);
 }
+
 
 GLfloat CTerrainMap::GetTerrainHeight(GLfloat fX, GLfloat fZ)
 {
@@ -1390,4 +1433,44 @@ void CTerrainMap::ReloadTextures()
 {
 	m_TerrainTextureset.Reload();
 	TexturesetBindlessUpdate();
+}
+
+
+/**
+ * Places a single object instance into the world at a specific position.
+ * @param stMeshName The name of the mesh to use as a prototype.
+ * @param v3Position The world-space position to place the object.
+ * @return A pointer to the newly created physics object, or nullptr on failure.
+ */
+CPhysicsObject* CTerrainMap::PlaceObjectAt(const std::string& stMeshName, const SVector3Df& v3Position)
+{
+	// 1. Calculate which terrain area this position falls into.
+	// The floor function handles negative coordinates correctly.
+	GLint iAreaNumX = static_cast<GLint>(floor(v3Position.x / TERRAIN_XSIZE));
+	GLint iAreaNumZ = static_cast<GLint>(floor(v3Position.z / TERRAIN_ZSIZE));
+
+	// 2. Get a pointer to that specific CTerrainAreaData.
+	CTerrainAreaData* pTargetArea = nullptr;
+	GLint iAreaNum;
+	if (!GetAreaNumByCoord(iAreaNumX, iAreaNumZ, &iAreaNum))
+	{
+		sys_err("PlaceObjectAt: No loaded terrain area at position (%f, %f, %f)", v3Position.x, v3Position.y, v3Position.z);
+		return nullptr;
+	}
+
+	if (GetAreaPtr(iAreaNum, &pTargetArea))
+	{
+		// 3. Call the main AddObject logic to create the instance.
+		// This function handles creating the physics object, render data, and adding them to the correct systems.
+		// We'll pass default rotation and scale for this example.
+		SVector3Df v3Rotation(0.0f, 0.0f, 0.0f);
+		SVector3Df v3Scale(1.0f, 1.0f, 1.0f);
+
+		return pTargetArea->AddObject(stMeshName, v3Position, v3Rotation, v3Scale);
+	}
+	else
+	{
+		sys_err("PlaceObjectAt: Failed to get terrain area pointer for (%d, %d)", iAreaNumX, iAreaNumZ);
+		return nullptr;
+	}
 }

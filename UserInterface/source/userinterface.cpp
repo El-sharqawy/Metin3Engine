@@ -7,6 +7,7 @@
 #include "../../LibTerrain/source/TerrainMap.h"
 #include "../../LibGame/source/SkyBox.h"
 #include "../../LibGame/source/PhysicsObject.h"
+#include "../../LibGame/source/PhysicsWorld.h"
 
 #if defined(_WIN64)
 #undef min
@@ -93,6 +94,12 @@ void CUserInterface::RenderMapsUI()
 	if (ImGui::Button("Save Map", buttonSize))
 	{
 		pTerrainManager->SaveMap();
+	}
+
+	static bool bIsWireFrame = m_pWindow->IsWireFrame();
+	if (ImGui::Checkbox("Wireframe Mode", &bIsWireFrame))
+	{
+		m_pWindow->SetWireFrame(bIsWireFrame);
 	}
 }
 
@@ -468,7 +475,18 @@ void CUserInterface::RenderTerrainUI()
 				{ // action if OK
 					std::string filePathName = ImGuiFileDialog::Instance()->GetFilePathName();	// full name
 					std::string filePath = ImGuiFileDialog::Instance()->GetCurrentPath();		// just the path
-					pTerrainManager->AddTerrainTexture(filePathName);
+
+					// Define our base directory. This is the part we want to remove.
+					// In this case, it's the root of our project.
+					std::filesystem::path baseDir = "G:/Projects/Metin3Engine/UserInterface/";
+
+					// Create filesystem path objects for easier manipulation
+					std::filesystem::path fullPath(filePathName);
+
+					// Get the relative path
+					std::filesystem::path relativePath = std::filesystem::relative(fullPath, baseDir);
+
+					pTerrainManager->AddTerrainTexture(relativePath.string());
 					//terrain->DoBindlesslyTexturesSetup();
 				}
 
@@ -605,7 +623,7 @@ void CUserInterface::RenderSkyBoxUI()
 {
 	CSkyBox::Instance().SetGUI();
 }
-void CUserInterface::RenderPlacingObjectsUI()
+void CUserInterface::RenderObjectsControlUI()
 {
 	static CTerrainManager* pTerrainManager = m_pWindow->GetTerrainManager();
 
@@ -615,9 +633,15 @@ void CUserInterface::RenderPlacingObjectsUI()
 		return;
 	}
 
+	static bool IsUpdatePhysics = CPhysicsWorld::Instance().IsUpdatePhysics();
 	static bool bIsPickingObj = pTerrainManager->IsPickingObjects();
 
 	ImVec2 buttonSize(125, 25);
+
+	if (ImGui::Checkbox("Physics Update", &IsUpdatePhysics))
+	{
+		CPhysicsWorld::Instance().SetUpdatePhysics(IsUpdatePhysics);
+	}
 
 	if (ImGui::Checkbox("Terrain Picking", &bIsPickingObj))
 	{
@@ -630,10 +654,23 @@ void CUserInterface::RenderPlacingObjectsUI()
 	{
 		if (pTerrainManager->GetCurrentPickedObject())
 		{
-			ImGui::InputFloat3("Object Position", (float*)&pTerrainManager->GetCurrentPickedObject()->GetPosition()[0]);
+			ImGui::TextColored(ImVec4(0, 1, 0, 1), "Picking The Object %s", pTerrainManager->GetCurrentPickedObject()->GetObjectName().c_str());
+			ImGui::NewLine();
+
+			ImGui::TextColored(ImVec4(1, 1, 1, 1), "Object Properties");
+			ImGui::SliderFloat3("Object Position", (float*)&pTerrainManager->GetCurrentPickedObject()->GetPosition()[0], 0.0f, 1000.0f);
+			ImGui::SliderFloat3("Object Rotation", (float*)&pTerrainManager->GetCurrentPickedObject()->GetRotation()[0], 0.0f, 1000.0f);
+			ImGui::SliderFloat3("Object Scale", (float*)&pTerrainManager->GetCurrentPickedObject()->GetScale()[0], 0.0f, 1.0f);
 		}
 	}
 }
+
+void CUserInterface::RenderObjectsManagementUI()
+{
+	CMeshManager* pMeshManager = CMeshManager::InstancePtr();
+	pMeshManager->RenderMeshEditorUI();
+}
+
 void CUserInterface::Render()
 {
 	ImGui::Begin("Terrain Tools");
@@ -653,7 +690,13 @@ void CUserInterface::Render()
 
 		if (ImGui::BeginTabItem("Objects"))
 		{
-			//RenderPlacingObjectsUI();
+			RenderObjectsControlUI();
+			ImGui::EndTabItem();
+		}
+
+		if (ImGui::BeginTabItem("Models"))
+		{
+			RenderObjectsManagementUI();
 			ImGui::EndTabItem();
 		}
 
@@ -666,7 +709,7 @@ void CUserInterface::Render()
 		ImGui::EndTabBar();
 	}
 
-	auto reflectionTex = m_pWindow->GetTerrainManager()->GetTerrainMapPtr()->GetReflectionFBOPtr();
+	/*auto reflectionTex = m_pWindow->GetTerrainManager()->GetTerrainMapPtr()->GetReflectionFBOPtr();
 	if (reflectionTex->GetTextureID())
 	{
 		ImGui::Image((ImTextureID)(intptr_t)reflectionTex->GetTextureID(), ImVec2(128, 128), ImVec2(0, 0), ImVec2(1, 1), ImVec4(1, 1, 1, 1), ImVec4(1, 1, 1, 0.5));
@@ -680,7 +723,7 @@ void CUserInterface::Render()
 
 	ImGui::InputFloat3("Camera Position", (float*)&CCameraManager::Instance().GetCurrentCamera()->GetPosition()[0]);
 	ImGui::InputFloat3("Camera Target", (float*)&CCameraManager::Instance().GetCurrentCamera()->GetTarget()[0]);
-	ImGui::InputFloat3("Intersection Position", (float*)&m_pWindow->GetTerrainManager()->GetTerrainMapPtr()->GetIntersectionPoint()[0]);
+	ImGui::InputFloat3("Intersection Position", (float*)&m_pWindow->GetTerrainManager()->GetTerrainMapPtr()->GetIntersectionPoint()[0]);*/
 
 	ImGui::NewLine();
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);

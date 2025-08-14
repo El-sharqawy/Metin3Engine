@@ -18,6 +18,8 @@
 #include <fstream>
 #include <random>
 
+#include "CRC32.h"
+
 #include "../../LibGL/source/utils.h"
 #include "../../LibGL/source/stb_image.h"
 #include "../../LibGL/source/texture.h"

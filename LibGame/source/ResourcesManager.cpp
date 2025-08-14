@@ -21,7 +21,10 @@ CShader* CResourcesManager::GetShader(const std::string& stShaderName)
 	const SShaderProgramDefinitions& def = m_mShaderDefinitions.at(stShaderName);
 
 	// 3. Load the shader using the paths from the definition
+#if defined(ENABLE_SHADER_LOGS)
 	sys_log("CResourcesManager::GetShader: Compiling new shader '%s'", stShaderName.c_str());
+#endif
+
 	auto newShader = std::make_unique<CShader>(stShaderName);
 
 	// Assume your CShader::Load function is updated to take a definition struct

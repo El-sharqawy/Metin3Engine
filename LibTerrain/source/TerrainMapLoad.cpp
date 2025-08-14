@@ -6,8 +6,7 @@
 #include <mutex>
 #include "TerrainAreaData.h"
 #include "../../LibGame/source/ResourcesManager.h"
-
-#define USE_OPTIMIZED_TEXTURES_SETUP
+#include "../../LibGL/source/FrameBuffer.h"
 
 bool CTerrainMap::LoadMap(const SVector3Df& v3PlayerPos)
 {
@@ -183,7 +182,15 @@ bool CTerrainMap::LoadSettings(const std::string& stSettingsFile)
 
 bool CTerrainMap::LoadTerrain(GLint iTerrainCoordX, GLint iTerrainCoordZ, GLint iTerrainNum)
 {
+	if (IsTerrainLoaded(iTerrainCoordX, iTerrainCoordZ))
+	{
+		return true;
+	}
+
+#if defined(ENABLE_TERRAIN_LOGS)
 	ScopedTimer timer("CTerrainMap::LoadTerrain");
+#endif
+
 	GLint iTerrainID = iTerrainCoordX * 1000 + iTerrainCoordZ;
 
 	char c_szTerrainData[256];
@@ -291,7 +298,15 @@ bool CTerrainMap::LoadTerrain(GLint iTerrainCoordX, GLint iTerrainCoordZ, GLint 
 
 bool CTerrainMap::LoadArea(GLint iAreaCoordX, GLint iAreaCoordZ, GLint iAreaNum)
 {
+	if (IsAreaLoaded(iAreaCoordX, iAreaCoordZ))
+	{
+		return true;
+	}
+
+#if defined(ENABLE_TERRAIN_LOGS)
 	ScopedTimer timer("CTerrainMap::LoadArea");
+#endif
+
 	GLint iAreaID = iAreaCoordX * 1000 + iAreaCoordZ;
 
 	char c_szAreaData[256];
@@ -303,6 +318,7 @@ bool CTerrainMap::LoadArea(GLint iAreaCoordX, GLint iAreaCoordZ, GLint iAreaNum)
 	if (!pArea->LoadAreaObjectsFromFile(c_szAreaData))
 	{
 		sys_err("CTerrainMap::LoadArea: Failed to Load Area Objects from File for Area (%d, %d)", iAreaCoordX, iAreaCoordZ);
+		//return (false);
 	}
 
 	m_vLoadedAreas.push_back(pArea);

@@ -3,3 +3,8 @@
 #include "Stdafx.h"
 
 // When you are using pre-compiled headers, this source file is necessary for compilation to succeed.
+
+bool AreFloatsDifferent(GLfloat a, GLfloat b, GLfloat epsilon)
+{
+    return std::fabs(a - b) > epsilon;
+}

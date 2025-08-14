@@ -3,7 +3,30 @@
 #include <glad/glad.h>
 #include "../../LibMath/source/stdafx.h"
 
-#define INVALID_MATERIAL 0xFFFFFFFF
+#include "BoundingBox.h"
+#include "MeshTexture.h"
+
+class CMeshTexture2D;
+
+#define ASSIMP_LOAD_FLAGS (aiProcess_JoinIdenticalVertices |    \
+                           aiProcess_Triangulate |              \
+                           aiProcess_GenSmoothNormals |         \
+                           aiProcess_LimitBoneWeights |         \
+                           aiProcess_SplitLargeMeshes |         \
+                           aiProcess_ImproveCacheLocality |     \
+                           aiProcess_RemoveRedundantMaterials | \
+                           aiProcess_FindDegenerates |          \
+                           aiProcess_FindInvalidData |          \
+                           aiProcess_GenUVCoords |              \
+                           aiProcess_CalcTangentSpace)
+
+constexpr GLuint INVALID_MATERIAL = 0xFFFFFFFF;
+constexpr GLuint POSITION_LOCATION = 0;
+constexpr GLuint NORMALS_LOCATION = 1;
+constexpr GLuint TEX_COORDS_LOCATION = 2;
+constexpr GLuint WVP_LOCATION = 3;
+constexpr GLuint WORLD_LOCATION = 7;
+
 
 #pragma pack(push)
 #pragma pack(1)
@@ -44,10 +67,10 @@ typedef struct SPBRMaterial
 	float m_fRoughness;
 	bool m_bIsMetal;
 	SVector3Df m_v3Color;
-	CTexture* m_pAlbedo;
-	CTexture* m_pRoughness;
-	CTexture* m_pMetallic;
-	CTexture* m_pNormalMap;
+	CMeshTexture2D* m_pAlbedo;
+	CMeshTexture2D* m_pRoughness;
+	CMeshTexture2D* m_pMetallic;
+	CMeshTexture2D* m_pNormalMap;
 
 	SPBRMaterial()
 	{
@@ -71,8 +94,8 @@ typedef struct SMaterial
 	SVector4Df m_v4DiffuseColor;
 	SVector4Df m_v4SpecularColor;
 
-	CTexture* m_pDiffuseMap;
-	CTexture* m_pSpecularMap;
+	CMeshTexture2D* m_pDiffuseMap;
+	CMeshTexture2D* m_pSpecularMap;
 
 	float m_fTransparency;
 	float m_fAlpha;
@@ -96,12 +119,12 @@ typedef struct SMaterial
 	{
 		if (m_pDiffuseMap)
 		{
-			delete m_pDiffuseMap;
+			safe_delete(m_pDiffuseMap);
 		}
 
 		if (m_pSpecularMap)
 		{
-			delete m_pSpecularMap;
+			safe_delete(m_pSpecularMap);
 		}
 	}
 

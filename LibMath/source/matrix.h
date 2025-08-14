@@ -167,6 +167,22 @@ public:
 
 	}
 
+	CMatrix4Df operator*(const CMatrix4Df& rightMat) const
+	{
+		CMatrix4Df newMat{};
+		for (int8_t i = 0; i < 4; i++)
+		{
+			for (int8_t j = 0; j < 4; j++)
+			{
+				newMat.mat4[i][j] = mat4[i][0] * rightMat.mat4[0][j] +
+					mat4[i][1] * rightMat.mat4[1][j] +
+					mat4[i][2] * rightMat.mat4[2][j] +
+					mat4[i][3] * rightMat.mat4[3][j];
+			}
+		}
+		return newMat;
+	}
+
 	CMatrix4Df operator=(const glm::mat4& glmMat)
 	{
 		mat4[0][0] = glmMat[0][0]; mat4[0][1] = glmMat[0][1]; mat4[0][2] = glmMat[0][2]; mat4[0][3] = glmMat[0][3];

@@ -2,6 +2,8 @@
 #include "TerrainManager.h"
 #include "TerrainMap.h"
 #include "../../LibGame/source/PhysicsObject.h"
+#include "../../LibGame/source/PhysicsWorld.h"
+#include "../../LibGame/source/MeshManager.h"
 
 void CTerrainManager::ClearEditor()
 {
@@ -36,6 +38,7 @@ void CTerrainManager::ClearEditor()
 
 	m_bIsPickingObjects = false;
 	m_pCurrentPickedObject = nullptr;
+	m_pCurrentGrabbedObject = nullptr;
 
 	m_iNewMapSizeX = 0;
 	m_iNewMapSizeZ = 0;
@@ -549,10 +552,6 @@ void CTerrainManager::PickObject(const CRay& ray)
 			pPickedObject->SetSelectedObject(true);
 			sys_log("Picked object: %f, %f, %f", pPickedObject->GetPosition().x, pPickedObject->GetPosition().y, pPickedObject->GetPosition().z);
 		}
-		else
-		{
-			sys_log("No object picked");
-		}
 
 		m_pCurrentPickedObject = pPickedObject;
 	}
@@ -561,4 +560,64 @@ void CTerrainManager::PickObject(const CRay& ray)
 CPhysicsObject* CTerrainManager::GetCurrentPickedObject() const
 {
 	return (m_pCurrentPickedObject);
+}
+
+void CTerrainManager::GrabObject()
+{
+	if (m_pCurrentPickedObject) // Can only grab an object if one is highlighted
+	{
+		m_pCurrentGrabbedObject = m_pCurrentPickedObject;
+		
+		// TODO: Temporarily make the object static so gravity doesn't fight your mouse
+		m_pCurrentGrabbedObject->SetType(OBJECT_TYPE_STATIC);
+
+		sys_log("CTerrainManager::GrabObject: Grabbed object");
+	}
+}
+
+void CTerrainManager::ReleaseObject()
+{
+	// Releases the object, placing it in the world
+	if (m_pCurrentGrabbedObject)
+	{
+		sys_log("Released object At Pos (%f, %f, %f)", m_pCurrentGrabbedObject->GetPosition().x, m_pCurrentGrabbedObject->GetPosition().y, m_pCurrentGrabbedObject->GetPosition().z);
+
+		// Re-enable its physics
+		m_pCurrentGrabbedObject->SetType(OBJECT_TYPE_DYNAMIC);
+		m_pCurrentGrabbedObject = nullptr;
+	}
+}
+
+CPhysicsObject* CTerrainManager::GetCurrentGrabbedObject() const
+{
+	return (m_pCurrentGrabbedObject);
+}
+
+CPhysicsObject* CTerrainManager::AddObject(const std::string& meshName)
+{
+	// --- 1. Create and Configure the Physics Object ---
+	const auto& meshInfo = CMeshManager::Instance().GetMeshInfo(meshName);
+	if (!meshInfo.pMesh)
+	{
+		sys_err("AddObject: Could not find mesh info for '%s'", meshName.c_str());
+		return nullptr;
+	}
+
+	//m_pTerrainMap->AddObject(meshName, m_bBrushType, m_iEditTerrainNumX, m_iEditTerrainNumZ, m_iEditX, m_iEditZ);
+
+	const auto& defaultPhysics = meshInfo.PhysicsInfo;
+	CPhysicsObject* pNewPhysicsObject = new CPhysicsObject();
+	pNewPhysicsObject->SetMass(defaultPhysics.fMass);
+	pNewPhysicsObject->SetFriction(defaultPhysics.fFriction);
+	pNewPhysicsObject->SetRestitution(defaultPhysics.fRestitution);
+	pNewPhysicsObject->SetUseGravity(defaultPhysics.bUsesGravity);
+	pNewPhysicsObject->SetCollidable(defaultPhysics.bIsCollidable);
+	pNewPhysicsObject->SetType(defaultPhysics.ePhysicsType);
+
+	// Set its initial transform
+	pNewPhysicsObject->SetPosition(0.0f);
+	pNewPhysicsObject->SetRotation(0.0f);
+	pNewPhysicsObject->SetScale(0.0f);
+
+	return nullptr;
 }

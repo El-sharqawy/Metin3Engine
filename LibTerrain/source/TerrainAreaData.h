@@ -6,6 +6,8 @@
 #include "../../LibGame/source/mesh.h"
 #include "TerrainMap.h"
 
+#pragma pack(push)
+#pragma pack(1)
 typedef struct SObjectData
 {
 	CWorldTranslation WorldTranslation;	// World Translation of the object (pos, scale, rotation, height)
@@ -32,14 +34,6 @@ typedef struct SObjectData
 
 } TObjectData;
 
-struct SObjectDataCompare
-{
-	bool operator ()(const SObjectData& lhs, const SObjectData& rhs) const
-	{
-		return lhs.uiObjectID < rhs.uiObjectID; // Compare by unique ID
-	}
-};
-
 typedef struct SObjectInstanceGroup
 {
 	CShader* pShader;						// Pointer to the shader used for rendering the object
@@ -49,6 +43,21 @@ typedef struct SObjectInstanceGroup
 	GLuint GetInstanceCount() const { return static_cast<GLuint>(vecObjects.size()); }
 
 } TObjectInstanceGroup;
+
+typedef struct SPendingObjectsData
+{
+	std::string stMeshName;				// Name of the mesh to be loaded
+	std::string stShaderName;			// Name of the shader to be used
+
+	// Store raw transform data here if SObjectData doesn't fully encapsulate it
+	SVector3Df v3Position;				// Position in world space
+	SVector3Df v3Rotation;				// Rotation in world space
+	SVector3Df v3Scale;					// Scale in world space
+	GLuint uiObjectID;					// Unique identifier for the object
+	EObjectTypes eObjectType;			// Type of the object (static, dynamic, etc.)
+	nlohmann::json physicsOverrides;	// Store the overrides JSON for later application
+} SPendingObjectsData;;
+#pragma pack(pop)
 
 class CTerrainAreaData
 {
@@ -67,20 +76,28 @@ public:
 
 	void AddObjectInstanceGroup(CShader* pShader, CMesh* pMesh, const SObjectData& data);
 
-	void RenderAreaObjects(GLfloat fDeltaTime);
+	void RenderAreaObjects(const CMatrix4Df& viewMatrix, const CMatrix4Df& projectionMatrix);
+	void RenderAreaObjectsForDepth();
 
 	bool LoadAreaObjectsFromFile(const std::string& stAreaObjectsData);
 	bool SaveAreaObjectsFromFile(const std::string& stMapName);
 
 	std::vector<TObjectInstanceGroup>& GetObjectsGroups();
 
-	// Creates a new object dynamically and adds it to the terrain area.
-	bool CreateObject(const std::string& meshName, const std::string& shaderName, const SVector3Df& position, const SVector3Df& rotation, const SVector3Df& scale);
-
 	SVector3Df GetWorldOrigin() const;
 
+	CPhysicsObject* AddObject(const std::string& stMeshName, const SVector3Df& v3Position, const SVector3Df& v3Rotation, const SVector3Df& v3Scale);
+
+	void UpdateAreaObjects();
+	bool CreateObjectFromData(const SPendingObjectsData& pendingInfo, std::shared_ptr<CMesh> pMesh, CShader* pShader);
+
 protected:
-	std::vector<TObjectInstanceGroup> m_vObjectsGroups;		// Vector of object instance groups
+	// Vector of object instance groups
+	std::vector<TObjectInstanceGroup> m_vObjectsGroups;
+
+	// Vector of pending objects to be loaded later
+	std::vector<SPendingObjectsData> m_vPendingObjects;
+
 	CTerrainMap* m_pOwnerTerrainMap;						// Pointer to the terrain map associated with this area
 
 	// The area num among terrains (0,0) - (1, 0) - (1, 1);

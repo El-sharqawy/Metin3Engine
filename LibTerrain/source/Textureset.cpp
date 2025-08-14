@@ -198,8 +198,6 @@ bool CTerrainTextureset::Load(const std::string& stFileName)
 
 void CTerrainTextureset::Reload()
 {
-	sys_log("Reloading Textures %zu", m_vTextures.size());
-
 	for (size_t i = 1; i < m_vTextures.size(); ++i)
 	{
 		TTerrainTexture& tex = m_vTextures[i];
@@ -220,7 +218,6 @@ void CTerrainTextureset::Reload()
 		}
 
 		tex.m_pTexture->MakeResident();
-
 		tex.m_uiTextureID = tex.m_pTexture->GetTextureID();
 	}
 }
@@ -251,7 +248,9 @@ bool CTerrainTextureset::SetTexture(size_t iIndex, const TTerrainTexture& Textur
 
 	tex.m_uiTextureID = tex.m_pTexture->GetTextureID();
 
+#if defined(ENABLE_TEXTURESET_LOGS)
 	sys_log("CTerrainTextureSet::SetTexture: Added Texture: %s", tex.m_stFileName.c_str());
+#endif
 	return (true);
 }
 

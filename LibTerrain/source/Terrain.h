@@ -125,6 +125,10 @@ public:
 	void RenderPatches(const CCamera& renderCam, const SVector4Df& v4ClipPlane);
 	void RenderWater();
 
+	void RenderTerrainWaterFBOS();
+	void RenderTerrainPatches();
+	void RenderTerrainWater();
+
 	CTerrainPatch* GetTerrainPatchPtr(GLint iPatchNumX, GLint iPatchNumZ);
 
 	SVector2Df GetWorldOrigin() const;

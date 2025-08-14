@@ -1037,6 +1037,15 @@ SVector4Df CTerrain::CalculateClipPlane(const SVector3Df& v4Normal, const SVecto
 // The main loop should orchestrate the passes per patch
 void CTerrain::Render()
 {
+	// --- Draw Water to Main FBO ---
+	// The water shader will now sample from the reflection/refraction FBOs
+	// that were populated in the earlier passes.
+	//RenderWater();
+	//CWindow::Instance().GetFrameBuffer()->UnBindWriting();
+}
+
+void CTerrain::RenderTerrainWaterFBOS()
+{
 	// Loop through all terrain patches to find water patches
 	for (GLubyte bPatchNumZ = 0; bPatchNumZ < PATCH_ZCOUNT; bPatchNumZ++)
 	{
@@ -1056,19 +1065,26 @@ void CTerrain::Render()
 	}
 
 	glDisable(GL_CLIP_DISTANCE0);
+}
 
+void CTerrain::RenderTerrainPatches()
+{
 	// --- Draw Terrain to Main FBO ---
 	// Pass the current camera and the "no-op" clipping plane.
 	// This ensures the terrain shader receives a uniform, but it doesn't clip any geometry.
 	CWindow::Instance().GetFrameBuffer()->BindForWriting();
 	RenderPatches(CCameraManager::Instance().GetCurrentCameraRef(), SVector4Df(0.0f, 0.0f, 0.0f, 0.0f));
+	CWindow::Instance().GetFrameBuffer()->UnBindWriting();
+}
 
-	// --- Draw Water to Main FBO ---
-	// The water shader will now sample from the reflection/refraction FBOs
-	// that were populated in the earlier passes.
+void CTerrain::RenderTerrainWater()
+{
+	// --- Draw Terrain to Main FBO ---
+// Pass the current camera and the "no-op" clipping plane.
+// This ensures the terrain shader receives a uniform, but it doesn't clip any geometry.
+	CWindow::Instance().GetFrameBuffer()->BindForWriting();
 	RenderWater();
 	CWindow::Instance().GetFrameBuffer()->UnBindWriting();
-
 }
 
 // --- Modified Reflection Pass ---
@@ -1186,6 +1202,15 @@ void CTerrain::RenderPatches(const CCamera& renderCam, const SVector4Df& v4ClipP
 	pShader->setBool("u_DebugVisualizeAttrMap", false);
 	pShader->setBool("u_DebugVisualizeWater", false);
 
+	if (CWindow::Instance().IsWireFrame())
+	{
+		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	}
+	else
+	{
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	}
+
 	for (GLubyte bPatchNumZ = 0; bPatchNumZ < PATCH_ZCOUNT; bPatchNumZ++)
 	{
 		for (GLubyte bPatchNumX = 0; bPatchNumX < PATCH_XCOUNT; bPatchNumX++)
@@ -1238,13 +1263,21 @@ void CTerrain::RenderWater()
 	pWaterShader->setFloat("u_fMoveFactor", moveFactor);
 	pWaterShader->setFloat("fTiling", 6.0f);
 
-
 	// Bind common textures once
 	m_pOwnerTerrainMap->GetWaterDudvTexPtr()->Bind(GL_TEXTURE0);
 	m_pOwnerTerrainMap->GetWaterNormalTexPtr()->Bind(GL_TEXTURE1);
 	m_pOwnerTerrainMap->GetReflectionFBOPtr()->BindTextureForReading(GL_TEXTURE2);
 	m_pOwnerTerrainMap->GetRefractionFBOPtr()->BindTextureForReading(GL_TEXTURE3);
 	m_pOwnerTerrainMap->GetRefractionFBOPtr()->BindDepthForReading(GL_TEXTURE4);
+
+	if (CWindow::Instance().IsWireFrame())
+	{
+		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	}
+	else
+	{
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	}
 
 	for (GLubyte bPatchNumZ = 0; bPatchNumZ < PATCH_ZCOUNT; bPatchNumZ++)
 	{
