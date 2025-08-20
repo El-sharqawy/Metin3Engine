@@ -133,6 +133,7 @@ public:
 
 	// Objects part
 	CPhysicsObject* PlaceObjectAt(const std::string& stMeshName, const SVector3Df& v3Position);
+	void DeleteObject(CPhysicsObject* pObjectToDelete);
 
 protected:
 	// Map Variables

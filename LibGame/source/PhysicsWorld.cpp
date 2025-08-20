@@ -82,7 +82,9 @@ void CPhysicsWorld::RemoveObject(CPhysicsObject* pObject)
 	auto it = std::remove(m_vPhysicsObjects.begin(), m_vPhysicsObjects.end(), pObject);
 	if (it != m_vPhysicsObjects.end())
 	{
-		safe_delete(pObject);
+		// DO NOT DELETE THE POINTER HERE.
+		// The owner (CTerrainAreaData) is responsible for that.
+		// safe_delete(pObject);
 
 		m_vPhysicsObjects.erase(it, m_vPhysicsObjects.end());
 	}

@@ -1,20 +1,9 @@
 #include "Stdafx.h"
 #include <GLFW/glfw3.h>
-#include "../../LibGL/source/Window.h"
+#include "../../LibGL/source/Stdafx.h"
 
 #ifdef _DEBUG
 #include <crtdbg.h>
-#endif
-
-#pragma comment(lib, "glfw3.lib")
-#if defined(_DEBUG)
-#pragma comment(lib, "Debug/assimp-vc143-mtd.lib")
-#pragma comment(lib, "Debug/zlibstaticd.lib")
-#pragma comment(lib, "Debug/meshoptimizer_mtd.lib")
-#else
-#pragma comment(lib, "Release/assimp-vc143-mt.lib")
-#pragma comment(lib, "Release/zlibstatic.lib")
-#pragma comment(lib, "Release/meshoptimizer.lib")
 #endif
 
 int main()

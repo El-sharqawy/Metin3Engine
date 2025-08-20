@@ -29,13 +29,6 @@ extern void WriteBinaryFile(const char* pFilename, const void* pData, int size);
 
 extern std::string GetFullPath(const std::string& Dir, const aiString& Path);
 
-extern void SaveHeightMapRawGz(const std::string& path, const CGrid<float>& heightMap);
-extern void SaveWeightRawGz(const std::string& path, const CGrid<SVector4Df>& weightMap);
-extern void SaveIndexRawGz(const std::string& path, const CGrid<SVector4Di>& indexMap);
-extern void LoadHeightMapRawGz(const std::string& path, CGrid<float>& heightMap);
-extern void LoadWeightRawGz(const std::string& path, CGrid<SVector4Df>& weightMap);
-extern void LoadIndexRawGz(const std::string& path, CGrid<SVector4Df>& indexMap);
-
 extern void create_directory_if_missing(const std::string& path);
 
 // Log System

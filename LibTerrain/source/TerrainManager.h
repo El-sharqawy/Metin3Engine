@@ -3,6 +3,7 @@
 #include <glad/glad.h>
 #include <string>
 #include "../../LibMath/source/vectors.h"
+#include "../../LibGame/source/MeshManager.h"
 
 class CTerrainMap;
 class CPhysicsObject;
@@ -114,7 +115,7 @@ public:
 	void ReloadTerrainTextures();
 	void SelectedTextureIndex(GLint iSelectedTextureIndex);
 
-	// Pick Object
+	// Pick and Place Objects
 	bool IsPickingObjects() const;
 	void SetPickingObjects(bool bIsPicking);
 	void PickObject(const CRay& ray);
@@ -124,8 +125,17 @@ public:
 	void ReleaseObject();
 	CPhysicsObject* GetCurrentGrabbedObject() const;
 
-	CPhysicsObject* AddObject(const std::string& meshName);
-	void DeleteObject(CPhysicsObject* pObjectToDelete);
+	bool IsPlacingObject() const;
+	void SetPlacingObject(bool bIsPlacing);
+
+	CPhysicsObject* AddObject();
+	void DeleteObject();
+
+	SVector3Df GetPickingPoint() const;
+	void SetPlacingMeshName(const std::string& stMeshName);
+	const std::string& GetPlacingMeshName() const;
+
+	void Update();
 
 protected:
 	/*** Editor Variables ***/
@@ -170,4 +180,9 @@ protected:
 	CPhysicsObject* m_pCurrentPickedObject;	// The object we are hovering over
 	CPhysicsObject* m_pCurrentGrabbedObject; // The object you are actively dragging
 
+	// Object Place
+	bool m_bIsPlacingObject; // Are we currently placing an object?
+	std::string m_stPlacingMeshName; // The name of the mesh we are placing
+	SVector3Df m_v3PreviewPosition;   // The 3D world position for the preview
+	SMeshInfo m_MeshInfo; // Mesh info for the preview
 };

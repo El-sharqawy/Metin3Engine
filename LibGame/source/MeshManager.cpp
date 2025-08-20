@@ -6,6 +6,8 @@
 #include "PhysicsObject.h"
 #include "../../LibImageUI/stdafx.h"
 #include "Utils.h"
+#include "../../LibGL/source/window.h"
+#include "../../LibTerrain/source/TerrainManager.h"
 
 CMeshManager::CMeshManager()
 {
@@ -56,30 +58,93 @@ std::shared_ptr<CMesh> CMeshManager::GetMesh(const std::string& stMeshName)
 	return nullptr;
 }
 
-void CMeshManager::RenderMesh(const std::string& stMeshName)
+/**
+ * @brief Renders a single instance of a mesh. Ideal for preview objects or unique entities.
+ *
+ * This function is separate from the main instanced renderer and does not interfere
+ * with the global instance buffers used for large batches.
+ *
+ * @param stMeshName The name/ID of the mesh to render.
+ * @param shader The shader to use for rendering (e.g., a semi-transparent "ghost" shader).
+ * @param matWorld The world matrix for the object's position, rotation, and scale.
+ * @param matWVP The combined World-View-Projection matrix.
+ */
+void CMeshManager::RenderSingleInstance(const std::string& stMeshName, const CMatrix4Df& matWorld, const CMatrix4Df& matWVP)
 {
-	// Find the mesh in the map
+	// 1. Find the mesh info in the map
 	auto it = m_vLoadedMeshes.find(stMeshName);
 	if (it == m_vLoadedMeshes.end())
 	{
-		sys_err("CMeshManager::RenderMesh: Mesh '%s' not found.", stMeshName.c_str());
+		sys_err("CMeshManager::RenderSingleInstance: Mesh '%s' not found or not loaded.", stMeshName.c_str());
 		return;
 	}
 
+	if (!it->second.pMesh)
+	{
+		sys_err("CMeshManager::RenderSingleInstance: Mesh '%s' has no mesh data.", stMeshName.c_str());
+		return;
+	}
+
+	// Ensure the correct shader is active
+	CShader* pShader = CResourcesManager::Instance().GetShader("StandardInstancedModel");
+	pShader->Use();
+
+	// 2. Upload the new instance data for this SINGLE object
+	//    This overwrites the data at the start of the global buffers.
+	if (IsGLVersionHigher(4, 5))
+	{
+		glNamedBufferSubData(m_uiGlobalBuffers[WVP_MAT_BUFFER], 0, sizeof(CMatrix4Df), &matWVP);
+		glNamedBufferSubData(m_uiGlobalBuffers[WORLD_MAT_BUFFER], 0, sizeof(CMatrix4Df), &matWorld);
+	}
+	else
+	{
+		glBindBuffer(GL_ARRAY_BUFFER, m_uiGlobalBuffers[WVP_MAT_BUFFER]);
+		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(CMatrix4Df), &matWVP);
+
+		glBindBuffer(GL_ARRAY_BUFFER, m_uiGlobalBuffers[WORLD_MAT_BUFFER]);
+		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(CMatrix4Df), &matWorld);
+	}
+
+	// 3. Bind the global VAO (which is already configured for instancing)
+	glBindVertexArray(m_uiGlobalVAO);
+
+	// 4. Get mesh data and global offsets
 	std::shared_ptr<CMesh> mesh = it->second.pMesh;
-	if (!mesh)
+	const GLuint globalBaseVertex = static_cast<GLuint>(mesh->GetVertexOffset());
+	const GLuint globalBaseIndex = static_cast<GLuint>(mesh->GetIndexOffset());
+
+	auto& vMaterials = mesh->GetMaterials();
+
+	// 5. Loop through sub-meshes and draw exactly ONE instanced
+	for (const auto& subMesh : mesh->GetMeshes())
 	{
-		sys_err("CMeshManager::RenderMesh: Mesh '%s' has no mesh data.", stMeshName.c_str());
-		return;
+		// Bind materials
+		const GLuint uiMaterialIndex = subMesh.uiMaterialIndex;
+		ASSERT(uiMaterialIndex < vMaterials.size(), "Check Mesh Materials");
+
+		if (vMaterials[uiMaterialIndex].m_pDiffuseMap)
+		{
+			vMaterials[uiMaterialIndex].m_pDiffuseMap->BindTexture(COLOR_TEXTURE_UNIT);
+		}
+
+		if (vMaterials[uiMaterialIndex].m_pSpecularMap)
+		{
+			vMaterials[uiMaterialIndex].m_pSpecularMap->BindTexture(SPECULAR_EXPONENT_UNIT);
+		}
+
+		glDrawElementsInstancedBaseVertex(
+			GL_TRIANGLES,
+			subMesh.uiNumIndices,
+			GL_UNSIGNED_INT,
+			(void*)(sizeof(GLuint) * (globalBaseIndex + subMesh.uiBaseIndex)),
+			1, // <-- Draw only one instance
+			globalBaseVertex + subMesh.uiBaseVertex
+		);
 	}
 
-	if (!m_bIsPopulatedBuffers)
-	{
-		return;
-	}
-
-	//mesh->Render(m_uiGlobalVAO);
+	glBindVertexArray(0);
 }
+
 
 void CMeshManager::RenderMeshInstanced(const std::string& stMeshName, GLuint uiNumInstances, const std::vector<CMatrix4Df>& matWorld, const std::vector<CMatrix4Df>& matWVP)
 {
@@ -419,10 +484,13 @@ bool CMeshManager::SaveMeshesToJson(const std::string& stMeshesFilePath)
 	return true;
 }
 
-void CMeshManager::RenderMeshEditorUI()
+void CMeshManager::RenderMeshEditorUI(CTerrainManager* pTerrainManager)
 {
 	// A static variable to keep track of the selected mesh
 	static std::string selectedMeshName = "";
+	static std::string selectedUIMesh = "";
+	static SMeshInfo meshInfo;
+	static bool bIsPlacingObject = pTerrainManager->IsPlacingObject();
 
 	// --- Left Pane: List of Meshes ---
 	ImGui::BeginChild("MeshList", ImVec2(150, 0), true);
@@ -432,6 +500,10 @@ void CMeshManager::RenderMeshEditorUI()
 		if (ImGui::Selectable(meshName.c_str(), selectedMeshName == meshName))
 		{
 			selectedMeshName = meshName;
+			selectedUIMesh = meshName;
+
+			// Tell the editor to start placement mode
+			pTerrainManager->SetPlacingMeshName(selectedUIMesh);
 		}
 	}
 	ImGui::EndChild();
@@ -441,7 +513,27 @@ void CMeshManager::RenderMeshEditorUI()
 	// --- Right Pane: Add/Remove Buttons and Details ---
 	ImGui::BeginGroup();
 
-	// "Add New..." Button
+	if (ImGui::Checkbox("Objects Placing", &bIsPlacingObject))
+	{
+		pTerrainManager->SetPlacingObject(bIsPlacingObject);
+		pTerrainManager->SetEditingTerrain(!bIsPlacingObject); // Disable terrain editing when picking objects
+	}
+
+	if (!selectedUIMesh.empty())
+	{
+		if (ImGui::Button("Clear Selection", ImVec2(120, 0)))
+		{
+			selectedUIMesh = ""; // Clear the selection
+			selectedMeshName = ""; // Clear the selected mesh name
+			pTerrainManager->SetPlacingMeshName(selectedMeshName);
+		}
+	}
+
+	ImGui::NewLine();
+	ImGui::Text("Mesh Position: (%f, %f, %f)", pTerrainManager->GetPickingPoint().x, pTerrainManager->GetPickingPoint().y, pTerrainManager->GetPickingPoint().z);
+
+	ImGui::NewLine();
+
 	if (ImGui::Button("Add New Mesh"))
 	{
 		ImGui::OpenPopup("Add Mesh Popup");
@@ -470,7 +562,7 @@ void CMeshManager::RenderMeshEditorUI()
 	// Display details of the selected mesh
 	if (!selectedMeshName.empty())
 	{
-		auto& meshInfo = m_vLoadedMeshes.at(selectedMeshName);
+		meshInfo = m_vLoadedMeshes.at(selectedMeshName);
 		ImGui::Text("Details for: %s", selectedMeshName.c_str());
 		ImGui::Text("File Path: %s", meshInfo.stFilePath.c_str());
 		ImGui::Text("CRC32: %u", meshInfo.uiCRC32);

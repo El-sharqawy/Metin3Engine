@@ -107,7 +107,6 @@ void CTerrainAreaData::RenderAreaObjects(const CMatrix4Df& viewMatrix, const CMa
 	{
 		if (group.vecObjects.empty() || !group.pMesh || !group.pShader)
 		{
-			sys_log("CTerrainAreaData::RenderAreaObjects: Skipping group with no objects or mesh/shader.");
 			continue;
 		}
 
@@ -165,16 +164,18 @@ void CTerrainAreaData::RenderAreaObjects(const CMatrix4Df& viewMatrix, const CMa
 			// Light Material Data
 			pModelShader->setVec3("uLightMaterial.v3LightColor", CSkyBox::Instance().GetLightColor());
 			pModelShader->setVec3("uLightMaterial.v3LightDirection", CSkyBox::Instance().GetLightDir());
-			pModelShader->setFloat("uLightMaterial.fAmbientIntensity", 0.1f);
+			pModelShader->setFloat("uLightMaterial.fAmbientIntensity", 1.0f);
 
 			pModelShader->setVec3("v3CameraPosition", cameraPos);
 
 			// Pass the temporary vectors of VISIBLE objects to the render function
 			// NOTE: The instance count is now the size of the visible objects vector
 
+			GLuint instanceCount = static_cast<GLuint>(visibleWorldMatrices.size());
+
 			CMeshManager::Instance().RenderMeshInstanced(
 				group.pMesh->GetMeshName(),
-				visibleWorldMatrices.size(), // Use the count of visible objects
+				instanceCount, // Use the count of visible objects
 				visibleWorldMatrices,
 				visibleWvpMatrices
 			);
@@ -215,9 +216,12 @@ void CTerrainAreaData::RenderAreaObjectsForDepth()
 			// For the depth pass, we only need the model matrices.
 			// Your instanced rendering function should be able to handle this.
 			// You might need to adjust it to take a single list of matrices.
+
+			GLuint instanceCount = static_cast<GLuint>(worldMatrices.size());
+
 			CMeshManager::Instance().RenderMeshInstancedForDepth(
 				group.pMesh->GetMeshName(),
-				worldMatrices.size(),
+				instanceCount,
 				worldMatrices
 			);
 		}
@@ -726,6 +730,59 @@ bool CTerrainAreaData::CreateObjectFromData(const SPendingObjectsData& pendingIn
 	AddObjectInstanceGroup(pShader, pMesh.get(), newObjectData);
 
 	return (true);
+}
+
+/**
+ * @brief Removes an object instance from the area.
+ *
+ * This function removes the object from the physics world, finds and removes its
+ * render data from the appropriate instance group, and then deletes the object
+ * to free its memory.
+ *
+ * @param pObjectToRemove A pointer to the CPhysicsObject to be deleted.
+ */
+void CTerrainAreaData::RemoveObject(CPhysicsObject* pObjectToRemove)
+{
+	if (!pObjectToRemove)
+	{
+		return; // Safety check: do nothing if the pointer is null
+	}
+
+	// --- 1. Remove the object from the physics simulation ---
+	CPhysicsWorld::Instance().RemoveObject(pObjectToRemove);
+
+	// --- 2. Find and remove the object from the rendering system ---
+	// We need to iterate through all our instance groups to find the object.
+	for (auto& group : m_vObjectsGroups)
+	{
+		auto& instances = group.vecObjects;
+
+		// Use the C++ standard library's "erase-remove idiom" to find
+		// and remove the SObjectData that contains our physics object.
+		auto it = std::remove_if(instances.begin(), instances.end(),
+			[&](const SObjectData* data) {
+				return data->pPhysicsObject == pObjectToRemove;
+			});
+
+		// If the iterator 'it' is not at the end, it means we found and "removed" the object.
+		if (it != instances.end())
+		{
+			// Erase the "removed" elements from the vector.
+			instances.erase(it, instances.end());
+
+			// --- 3. Free the object's memory ---
+			// Now that the object is gone from physics and rendering, it's safe to delete it.
+			delete pObjectToRemove;
+
+			// We've done our job, so we can exit the function.
+			return;
+		}
+	}
+
+	// If the loop finishes, it means the object was in the physics world but not
+	// in our render list. This might indicate a bug, but we should still delete
+	// the object to prevent a memory leak.
+	sys_err("CTerrainAreaData::RemoveObject: Object was not found in any render group, but is being deleted anyway.");
 }
 
 void CTerrainAreaData::DestroySystem()

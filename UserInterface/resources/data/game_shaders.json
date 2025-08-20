@@ -50,6 +50,20 @@
         "vertex": "shaders/skybox_shadow.vert",
         "fragment": "shaders/skybox_shadow.frag"
       }
+    },
+    {
+      "name": "FontsShader",
+      "stages": {
+        "vertex": "shaders/fonts_shader.vert",
+        "fragment": "shaders/fonts_shader.frag"
+      }
+    },
+    {
+      "name": "FontsGLShader",
+      "stages": {
+        "vertex": "shaders/fonts_gl_shader.vert",
+        "fragment": "shaders/fonts_gl_shader.frag"
+      }
     }
   ]
 }

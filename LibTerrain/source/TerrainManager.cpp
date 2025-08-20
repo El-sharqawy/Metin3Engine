@@ -65,8 +65,6 @@ bool CTerrainManager::LoadMap(const std::string& stMapName)
 	m_pTerrainMap->SetMapReady(false);
 	m_pTerrainMap->SetMapName(stMapName);
 
-	CResourcesManager::Instance().LoadShaderDefinitions(stMapName + "\\map_shaders.json");
-
 	if (!m_pTerrainMap->LoadMap(0.0f))
 	{
 		sys_err("CTerrainManager::LoadMap: Failed to Load The Map %s", stMapName.c_str());

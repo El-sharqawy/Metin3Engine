@@ -90,6 +90,7 @@ public:
 
 	void UpdateAreaObjects();
 	bool CreateObjectFromData(const SPendingObjectsData& pendingInfo, std::shared_ptr<CMesh> pMesh, CShader* pShader);
+	void RemoveObject(CPhysicsObject* pObjectToRemove);
 
 protected:
 	// Vector of object instance groups

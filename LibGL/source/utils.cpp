@@ -1,7 +1,6 @@
 #include "Stdafx.h"
 #include "Utils.h"
 #include "../../LibMath/source/grid.h"
-#include <filesystem>
 #include <ctime>
 #include <chrono>
 
@@ -161,10 +160,9 @@ std::string GetFullPath(const std::string& Dir, const aiString& Path)
 
 void create_directory_if_missing(const std::string& path)
 {
-    namespace fs = std::filesystem;
-    if (!fs::exists(path))
+    if (!std::filesystem::exists(path))
     {
-        fs::create_directories(path);  // Creates parent directories too
+        std::filesystem::create_directories(path);  // Creates parent directories too
     }
 }
 

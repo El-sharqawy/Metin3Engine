@@ -60,7 +60,7 @@ public:
 	// Should be called once to load the texture
 	bool Load(bool bBindless = false);
 	void Load(GLuint uiBufferSize, void* pImageData);
-	void Load(const std::string& stFileName, bool bBindless = false);
+	bool Load(const std::string& stFileName, bool bBindless = false);
 
 	void LoadRaw(GLint iWidth, GLint iHeight, GLint iChannelsBPP, unsigned char* pImageData);
 
@@ -106,8 +106,13 @@ public:
 	void SetSize(GLint iWidth, GLint iHeight);
 	void SetMipLevels(GLint iMipLevels);
 
-private:
 	void LoadInternal(void* pImageData);
+
+	void SetWidth(GLint iWidth) { m_iWidth = iWidth; }
+	void SetHeight(GLint iHeight) { m_iHeight = iHeight; }
+	void SetChannelBPP(GLint iChannelsBPP) { m_iChannelsBPP = iChannelsBPP; }
+
+private:
 	void LoadInternalDSA(void* pImageData);
 	void LoadInternalNonDSA(void* pImageData);
 

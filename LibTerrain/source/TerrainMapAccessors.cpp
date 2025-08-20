@@ -1,6 +1,7 @@
 #include "Stdafx.h"
 #include "TerrainMap.h"
 #include "TerrainAreaData.h"
+#include "../../LibGame/source/PhysicsObject.h"
 
 // A Getters & Setters!
 void CTerrainMap::SetMapReady(bool bReady)
@@ -386,7 +387,7 @@ bool CTerrainMap::CreateTerrainFiles(GLint iTerrCoordX, GLint iTerrCoordZ)
 	GLint iID = iTerrCoordX * 1000 + iTerrCoordZ;
 	sprintf_s(szTerrainFolder, "%s\\%06d", m_strMapName.c_str(), iID);
 
-	create_directory_if_missing(szTerrainFolder);
+	create_directory_if_missing(std::string(szTerrainFolder));
 
 	// Create Terrain Properties (Objects, objs Pos, etc)
 	if (!pTerrainMap->NewTerrainProperties(m_strMapName))
@@ -1446,8 +1447,8 @@ CPhysicsObject* CTerrainMap::PlaceObjectAt(const std::string& stMeshName, const 
 {
 	// 1. Calculate which terrain area this position falls into.
 	// The floor function handles negative coordinates correctly.
-	GLint iAreaNumX = static_cast<GLint>(floor(v3Position.x / TERRAIN_XSIZE));
-	GLint iAreaNumZ = static_cast<GLint>(floor(v3Position.z / TERRAIN_ZSIZE));
+	GLint iAreaNumX = static_cast<GLint>(floor(v3Position.x / static_cast<GLfloat>(TERRAIN_XSIZE)));
+	GLint iAreaNumZ = static_cast<GLint>(floor(v3Position.z / static_cast<GLfloat>(TERRAIN_ZSIZE)));
 
 	// 2. Get a pointer to that specific CTerrainAreaData.
 	CTerrainAreaData* pTargetArea = nullptr;
@@ -1464,7 +1465,7 @@ CPhysicsObject* CTerrainMap::PlaceObjectAt(const std::string& stMeshName, const 
 		// This function handles creating the physics object, render data, and adding them to the correct systems.
 		// We'll pass default rotation and scale for this example.
 		SVector3Df v3Rotation(0.0f, 0.0f, 0.0f);
-		SVector3Df v3Scale(1.0f, 1.0f, 1.0f);
+		SVector3Df v3Scale(0.01f, 0.01f, 0.01f);
 
 		return pTargetArea->AddObject(stMeshName, v3Position, v3Rotation, v3Scale);
 	}
@@ -1472,5 +1473,35 @@ CPhysicsObject* CTerrainMap::PlaceObjectAt(const std::string& stMeshName, const 
 	{
 		sys_err("PlaceObjectAt: Failed to get terrain area pointer for (%d, %d)", iAreaNumX, iAreaNumZ);
 		return nullptr;
+	}
+}
+
+void CTerrainMap::DeleteObject(CPhysicsObject* pObjectToDelete)
+{
+	SVector3Df v3Position = pObjectToDelete->GetPosition();
+
+	// 1. Calculate which terrain area this position falls into.
+	// The floor function handles negative coordinates correctly.
+	GLint iAreaNumX = static_cast<GLint>(floor(v3Position.x / static_cast<GLfloat>(TERRAIN_XSIZE)));
+	GLint iAreaNumZ = static_cast<GLint>(floor(v3Position.z / static_cast<GLfloat>(TERRAIN_ZSIZE)));
+
+	// 2. Get a pointer to that specific CTerrainAreaData.
+	CTerrainAreaData* pTargetArea = nullptr;
+	GLint iAreaNum;
+	if (!GetAreaNumByCoord(iAreaNumX, iAreaNumZ, &iAreaNum))
+	{
+		sys_err("DeleteObject: No loaded terrain area at position (%f, %f, %f)", v3Position.x, v3Position.y, v3Position.z);
+		return;
+	}
+
+	if (GetAreaPtr(iAreaNum, &pTargetArea))
+	{
+		// 3. Call the main Delete logic to delete the instance.
+		pTargetArea->RemoveObject(pObjectToDelete);
+	}
+	else
+	{
+		sys_err("DeleteObject: Failed to get terrain area pointer for (%d, %d)", iAreaNumX, iAreaNumZ);
+		return;
 	}
 }

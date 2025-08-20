@@ -169,6 +169,7 @@ bool CTerrainManager::SaveAreas()
 void CTerrainManager::UpdateEditingPoint(SVector3Df* v3IntersectionPoint)
 {
 	m_pTerrainMap->GetPickingCoordinate(v3IntersectionPoint, &m_iEditX, &m_iEditZ, &m_iSubCellX, &m_iSubCellZ, &m_iEditTerrainNumX, &m_iEditTerrainNumZ);
+	m_v3PickingPoint = *v3IntersectionPoint;
 }
 
 void CTerrainManager::UpdateEditing()
@@ -353,6 +354,14 @@ void CTerrainManager::SetEditingHeight(bool bEdit)
 	{
 		SetEditingWater(false);
 	}
+	if (IsPickingObjects() && bEdit)
+	{
+		SetPickingObjects(false);
+	}
+	if (IsPlacingObject() && bEdit)
+	{
+		SetPlacingObject(false);
+	}
 
 	m_bIsEditingHeight = bEdit;
 }
@@ -375,6 +384,14 @@ void CTerrainManager::SetEditingTexture(bool bEdit)
 	if (IsEditingWater() && bEdit)
 	{
 		SetEditingWater(false);
+	}
+	if (IsPickingObjects() && bEdit)
+	{
+		SetPickingObjects(false);
+	}
+	if (IsPlacingObject() && bEdit)
+	{
+		SetPlacingObject(false);
 	}
 
 	m_bIsEditingTexture = bEdit;
@@ -399,6 +416,14 @@ void CTerrainManager::SetEditingAttribute(bool bEdit)
 	{
 		SetEditingWater(false);
 	}
+	if (IsPickingObjects() && bEdit)
+	{
+		SetPickingObjects(false);
+	}
+	if (IsPlacingObject() && bEdit)
+	{
+		SetPlacingObject(false);
+	}
 
 	m_bIsEditingAttribute = bEdit;
 }
@@ -421,6 +446,14 @@ void CTerrainManager::SetEditingWater(bool bEdit)
 	if (IsEditingAttribute() && bEdit)
 	{
 		SetEditingAttribute(false);
+	}
+	if (IsPickingObjects() && bEdit)
+	{
+		SetPickingObjects(false);
+	}
+	if (IsPlacingObject() && bEdit)
+	{
+		SetPlacingObject(false);
 	}
 
 	m_bIsEditingWater = bEdit;
@@ -523,17 +556,38 @@ void CTerrainManager::SetPickingObjects(bool bIsPicking)
 
 	if (bIsPicking)
 	{
-		sys_log("Object picking mode enabled");
+		sys_log("CTerrainManager::SetPickingObjects: Object picking mode enabled");
 	}
 	else
 	{
-		sys_log("Object picking mode disabled");
+		sys_log("CTerrainManager::SetPickingObjects: Object picking mode disabled");
 	}
 
 	if (m_pCurrentPickedObject)
 	{
 		m_pCurrentPickedObject->SetSelectedObject(false);
 		m_pCurrentPickedObject = nullptr;
+	}
+
+	if (IsEditingHeight() && bIsPicking)
+	{
+		SetEditingHeight(false);
+	}
+	if (IsEditingTexture() && bIsPicking)
+	{
+		SetEditingTexture(false);
+	}
+	if (IsEditingAttribute() && bIsPicking)
+	{
+		SetEditingAttribute(false);
+	}
+	if (IsEditingWater() && bIsPicking)
+	{
+		SetEditingWater(false);
+	}
+	if (IsPlacingObject() && bIsPicking)
+	{
+		SetPlacingObject(false);
 	}
 }
 
@@ -550,7 +604,7 @@ void CTerrainManager::PickObject(const CRay& ray)
 		if (pPickedObject)
 		{
 			pPickedObject->SetSelectedObject(true);
-			sys_log("Picked object: %f, %f, %f", pPickedObject->GetPosition().x, pPickedObject->GetPosition().y, pPickedObject->GetPosition().z);
+			sys_log("CTerrainManager::PickObject: Picked object At (%f, %f, %f)", pPickedObject->GetPosition().x, pPickedObject->GetPosition().y, pPickedObject->GetPosition().z);
 		}
 
 		m_pCurrentPickedObject = pPickedObject;
@@ -593,31 +647,116 @@ CPhysicsObject* CTerrainManager::GetCurrentGrabbedObject() const
 	return (m_pCurrentGrabbedObject);
 }
 
-CPhysicsObject* CTerrainManager::AddObject(const std::string& meshName)
+bool CTerrainManager::IsPlacingObject() const
+{
+	return (m_bIsPlacingObject);
+}
+
+void CTerrainManager::SetPlacingObject(bool bIsPlacing)
+{
+	m_bIsPlacingObject = bIsPlacing;
+	if (bIsPlacing)
+	{
+		sys_log("CTerrainManager::SetPlacingObject: Object placing mode enabled");
+	}
+	else
+	{
+		sys_log("CTerrainManager::SetPlacingObject: Object placing mode disabled");
+	}
+	if (m_pCurrentPickedObject)
+	{
+		m_pCurrentPickedObject->SetSelectedObject(false);
+		m_pCurrentPickedObject = nullptr;
+	}
+
+	if (IsEditingHeight() && bIsPlacing)
+	{
+		SetEditingHeight(false);
+	}
+	if (IsEditingTexture() && bIsPlacing)
+	{
+		SetEditingTexture(false);
+	}
+	if (IsEditingAttribute() && bIsPlacing)
+	{
+		SetEditingAttribute(false);
+	}
+	if (IsEditingWater() && bIsPlacing)
+	{
+		SetEditingWater(false);
+	}
+	if (IsPickingObjects() && bIsPlacing)
+	{
+		SetPickingObjects(false);
+	}
+}
+
+CPhysicsObject* CTerrainManager::AddObject()
 {
 	// --- 1. Create and Configure the Physics Object ---
-	const auto& meshInfo = CMeshManager::Instance().GetMeshInfo(meshName);
+	const auto& meshInfo = CMeshManager::Instance().GetMeshInfo(m_stPlacingMeshName);
 	if (!meshInfo.pMesh)
 	{
-		sys_err("AddObject: Could not find mesh info for '%s'", meshName.c_str());
+		sys_err("CTerrainManager::AddObject: Could not find mesh info for '%s'", m_stPlacingMeshName.c_str());
 		return nullptr;
 	}
 
-	//m_pTerrainMap->AddObject(meshName, m_bBrushType, m_iEditTerrainNumX, m_iEditTerrainNumZ, m_iEditX, m_iEditZ);
+	CPhysicsObject* pPhysicsObj = m_pTerrainMap->PlaceObjectAt(m_stPlacingMeshName, SVector3Df(m_v3PickingPoint.x, 0.0f, m_v3PickingPoint.z));
+	return pPhysicsObj;
+}
 
-	const auto& defaultPhysics = meshInfo.PhysicsInfo;
-	CPhysicsObject* pNewPhysicsObject = new CPhysicsObject();
-	pNewPhysicsObject->SetMass(defaultPhysics.fMass);
-	pNewPhysicsObject->SetFriction(defaultPhysics.fFriction);
-	pNewPhysicsObject->SetRestitution(defaultPhysics.fRestitution);
-	pNewPhysicsObject->SetUseGravity(defaultPhysics.bUsesGravity);
-	pNewPhysicsObject->SetCollidable(defaultPhysics.bIsCollidable);
-	pNewPhysicsObject->SetType(defaultPhysics.ePhysicsType);
+void CTerrainManager::DeleteObject()
+{
+	if (!m_pCurrentPickedObject)
+	{
+		sys_err("CTerrainManager::DeleteObject: No object selected to delete.");
+		return;
+	}
 
-	// Set its initial transform
-	pNewPhysicsObject->SetPosition(0.0f);
-	pNewPhysicsObject->SetRotation(0.0f);
-	pNewPhysicsObject->SetScale(0.0f);
+	// It's good practice to check if the object being deleted is also the one being grabbed.
+	if (m_pCurrentGrabbedObject == m_pCurrentPickedObject)
+	{
+		// If we are deleting the object we are currently holding,
+		// we must clear the grabbed pointer as well.
+		m_pCurrentGrabbedObject = nullptr;
+	}
 
-	return nullptr;
+	// Now, proceed with deletion.
+	m_pTerrainMap->DeleteObject(m_pCurrentPickedObject);
+
+	// Finally, clear the picked object pointer.
+	m_pCurrentPickedObject = nullptr;
+
+	sys_log("CTerrainManager::DeleteObject: Object deleted successfully.");
+}
+
+SVector3Df CTerrainManager::GetPickingPoint() const
+{
+	return (m_v3PickingPoint);
+}
+
+void CTerrainManager::SetPlacingMeshName(const std::string& stMeshName)
+{
+	m_stPlacingMeshName = stMeshName;
+}
+
+const std::string& CTerrainManager::GetPlacingMeshName() const
+{
+	return (m_stPlacingMeshName);
+}
+
+void CTerrainManager::Update()
+{
+	if (IsPlacingObject() && m_stPlacingMeshName.empty() == false)
+	{
+		CMatrix4Df profViewMat = CCameraManager::Instance().GetCurrentCamera()->GetViewProjMatrix();
+		CWorldTranslation worldTranslation;
+		worldTranslation.SetPosition(SVector3Df(m_v3PickingPoint.x, 0.0f, m_v3PickingPoint.z));
+		worldTranslation.SetRotation(SVector3Df(0.0f, 0.0f, 0.0f));
+		worldTranslation.SetScale(SVector3Df(0.01f, 0.01f, 0.01f));
+
+		CMatrix4Df modelMat = worldTranslation.GetMatrix();
+		CMatrix4Df mvpMat = profViewMat * modelMat;
+		CMeshManager::Instance().RenderSingleInstance(m_stPlacingMeshName, modelMat, mvpMat);
+	}
 }

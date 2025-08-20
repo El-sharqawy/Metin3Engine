@@ -1,0 +1,982 @@
+{
+    "ascent": 37,
+    "character_data_list": [
+        {
+            "advance": 1280,
+            "bitmap_left": 1,
+            "bitmap_top": 21,
+            "char": 97,
+            "height": 22,
+            "width": 19,
+            "x_offset": 0,
+            "y_offset": 0
+        },
+        {
+            "advance": 1472,
+            "bitmap_left": 0,
+            "bitmap_top": 33,
+            "char": 98,
+            "height": 34,
+            "width": 22,
+            "x_offset": 19,
+            "y_offset": 0
+        },
+        {
+            "advance": 1280,
+            "bitmap_left": 1,
+            "bitmap_top": 21,
+            "char": 99,
+            "height": 22,
+            "width": 18,
+            "x_offset": 41,
+            "y_offset": 0
+        },
+        {
+            "advance": 1536,
+            "bitmap_left": 1,
+            "bitmap_top": 33,
+            "char": 100,
+            "height": 34,
+            "width": 23,
+            "x_offset": 59,
+            "y_offset": 0
+        },
+        {
+            "advance": 1280,
+            "bitmap_left": 1,
+            "bitmap_top": 21,
+            "char": 101,
+            "height": 22,
+            "width": 18,
+            "x_offset": 82,
+            "y_offset": 0
+        },
+        {
+            "advance": 896,
+            "bitmap_left": 1,
+            "bitmap_top": 33,
+            "char": 102,
+            "height": 34,
+            "width": 15,
+            "x_offset": 100,
+            "y_offset": 0
+        },
+        {
+            "advance": 1408,
+            "bitmap_left": 1,
+            "bitmap_top": 21,
+            "char": 103,
+            "height": 33,
+            "width": 21,
+            "x_offset": 115,
+            "y_offset": 0
+        },
+        {
+            "advance": 1536,
+            "bitmap_left": 0,
+            "bitmap_top": 33,
+            "char": 104,
+            "height": 34,
+            "width": 24,
+            "x_offset": 136,
+            "y_offset": 0
+        },
+        {
+            "advance": 832,
+            "bitmap_left": 1,
+            "bitmap_top": 31,
+            "char": 105,
+            "height": 32,
+            "width": 11,
+            "x_offset": 160,
+            "y_offset": 0
+        },
+        {
+            "advance": 704,
+            "bitmap_left": -1,
+            "bitmap_top": 31,
+            "char": 106,
+            "height": 42,
+            "width": 10,
+            "x_offset": 171,
+            "y_offset": 0
+        },
+        {
+            "advance": 1536,
+            "bitmap_left": 0,
+            "bitmap_top": 33,
+            "char": 107,
+            "height": 34,
+            "width": 25,
+            "x_offset": 181,
+            "y_offset": 0
+        },
+        {
+            "advance": 768,
+            "bitmap_left": 0,
+            "bitmap_top": 33,
+            "char": 108,
+            "height": 34,
+            "width": 12,
+            "x_offset": 206,
+            "y_offset": 0
+        },
+        {
+            "advance": 2368,
+            "bitmap_left": 1,
+            "bitmap_top": 21,
+            "char": 109,
+            "height": 22,
+            "width": 36,
+            "x_offset": 0,
+            "y_offset": 43
+        },
+        {
+            "advance": 1600,
+            "bitmap_left": 1,
+            "bitmap_top": 21,
+            "char": 110,
+            "height": 22,
+            "width": 24,
+            "x_offset": 36,
+            "y_offset": 43
+        },
+        {
+            "advance": 1536,
+            "bitmap_left": 1,
+            "bitmap_top": 21,
+            "char": 111,
+            "height": 22,
+            "width": 21,
+            "x_offset": 60,
+            "y_offset": 43
+        },
+        {
+            "advance": 1536,
+            "bitmap_left": 0,
+            "bitmap_top": 21,
+            "char": 112,
+            "height": 32,
+            "width": 23,
+            "x_offset": 81,
+            "y_offset": 43
+        },
+        {
+            "advance": 1472,
+            "bitmap_left": 1,
+            "bitmap_top": 21,
+            "char": 113,
+            "height": 32,
+            "width": 23,
+            "x_offset": 104,
+            "y_offset": 43
+        },
+        {
+            "advance": 1152,
+            "bitmap_left": 1,
+            "bitmap_top": 21,
+            "char": 114,
+            "height": 22,
+            "width": 17,
+            "x_offset": 127,
+            "y_offset": 43
+        },
+        {
+            "advance": 1088,
+            "bitmap_left": 1,
+            "bitmap_top": 21,
+            "char": 115,
+            "height": 22,
+            "width": 15,
+            "x_offset": 144,
+            "y_offset": 43
+        },
+        {
+            "advance": 960,
+            "bitmap_left": 0,
+            "bitmap_top": 27,
+            "char": 116,
+            "height": 28,
+            "width": 14,
+            "x_offset": 159,
+            "y_offset": 43
+        },
+        {
+            "advance": 1536,
+            "bitmap_left": 0,
+            "bitmap_top": 21,
+            "char": 117,
+            "height": 22,
+            "width": 24,
+            "x_offset": 173,
+            "y_offset": 43
+        },
+        {
+            "advance": 1408,
+            "bitmap_left": -1,
+            "bitmap_top": 21,
+            "char": 118,
+            "height": 22,
+            "width": 24,
+            "x_offset": 197,
+            "y_offset": 43
+        },
+        {
+            "advance": 2176,
+            "bitmap_left": -1,
+            "bitmap_top": 21,
+            "char": 119,
+            "height": 22,
+            "width": 35,
+            "x_offset": 0,
+            "y_offset": 86
+        },
+        {
+            "advance": 1408,
+            "bitmap_left": 0,
+            "bitmap_top": 21,
+            "char": 120,
+            "height": 22,
+            "width": 23,
+            "x_offset": 35,
+            "y_offset": 86
+        },
+        {
+            "advance": 1408,
+            "bitmap_left": -1,
+            "bitmap_top": 21,
+            "char": 121,
+            "height": 32,
+            "width": 24,
+            "x_offset": 58,
+            "y_offset": 86
+        },
+        {
+            "advance": 1344,
+            "bitmap_left": 1,
+            "bitmap_top": 21,
+            "char": 122,
+            "height": 21,
+            "width": 19,
+            "x_offset": 82,
+            "y_offset": 86
+        },
+        {
+            "advance": 1856,
+            "bitmap_left": -1,
+            "bitmap_top": 32,
+            "char": 65,
+            "height": 33,
+            "width": 31,
+            "x_offset": 101,
+            "y_offset": 86
+        },
+        {
+            "advance": 1792,
+            "bitmap_left": 1,
+            "bitmap_top": 32,
+            "char": 66,
+            "height": 33,
+            "width": 25,
+            "x_offset": 132,
+            "y_offset": 86
+        },
+        {
+            "advance": 2048,
+            "bitmap_left": 2,
+            "bitmap_top": 32,
+            "char": 67,
+            "height": 33,
+            "width": 28,
+            "x_offset": 157,
+            "y_offset": 86
+        },
+        {
+            "advance": 2112,
+            "bitmap_left": 1,
+            "bitmap_top": 32,
+            "char": 68,
+            "height": 33,
+            "width": 30,
+            "x_offset": 185,
+            "y_offset": 86
+        },
+        {
+            "advance": 1792,
+            "bitmap_left": 1,
+            "bitmap_top": 32,
+            "char": 69,
+            "height": 33,
+            "width": 26,
+            "x_offset": 215,
+            "y_offset": 86
+        },
+        {
+            "advance": 1600,
+            "bitmap_left": 1,
+            "bitmap_top": 32,
+            "char": 70,
+            "height": 33,
+            "width": 24,
+            "x_offset": 0,
+            "y_offset": 129
+        },
+        {
+            "advance": 2176,
+            "bitmap_left": 2,
+            "bitmap_top": 32,
+            "char": 71,
+            "height": 33,
+            "width": 31,
+            "x_offset": 24,
+            "y_offset": 129
+        },
+        {
+            "advance": 2176,
+            "bitmap_left": 1,
+            "bitmap_top": 32,
+            "char": 72,
+            "height": 33,
+            "width": 32,
+            "x_offset": 55,
+            "y_offset": 129
+        },
+        {
+            "advance": 960,
+            "bitmap_left": 1,
+            "bitmap_top": 32,
+            "char": 73,
+            "height": 33,
+            "width": 13,
+            "x_offset": 87,
+            "y_offset": 129
+        },
+        {
+            "advance": 960,
+            "bitmap_left": -5,
+            "bitmap_top": 32,
+            "char": 74,
+            "height": 43,
+            "width": 19,
+            "x_offset": 100,
+            "y_offset": 129
+        },
+        {
+            "advance": 1984,
+            "bitmap_left": 1,
+            "bitmap_top": 32,
+            "char": 75,
+            "height": 33,
+            "width": 31,
+            "x_offset": 119,
+            "y_offset": 129
+        },
+        {
+            "advance": 1664,
+            "bitmap_left": 1,
+            "bitmap_top": 32,
+            "char": 76,
+            "height": 33,
+            "width": 26,
+            "x_offset": 150,
+            "y_offset": 129
+        },
+        {
+            "advance": 2752,
+            "bitmap_left": 1,
+            "bitmap_top": 32,
+            "char": 77,
+            "height": 33,
+            "width": 41,
+            "x_offset": 176,
+            "y_offset": 129
+        },
+        {
+            "advance": 2304,
+            "bitmap_left": 1,
+            "bitmap_top": 32,
+            "char": 78,
+            "height": 33,
+            "width": 35,
+            "x_offset": 0,
+            "y_offset": 172
+        },
+        {
+            "advance": 2240,
+            "bitmap_left": 2,
+            "bitmap_top": 32,
+            "char": 79,
+            "height": 33,
+            "width": 31,
+            "x_offset": 35,
+            "y_offset": 172
+        },
+        {
+            "advance": 1664,
+            "bitmap_left": 1,
+            "bitmap_top": 32,
+            "char": 80,
+            "height": 33,
+            "width": 24,
+            "x_offset": 66,
+            "y_offset": 172
+        },
+        {
+            "advance": 2240,
+            "bitmap_left": 2,
+            "bitmap_top": 32,
+            "char": 81,
+            "height": 39,
+            "width": 35,
+            "x_offset": 90,
+            "y_offset": 172
+        },
+        {
+            "advance": 1856,
+            "bitmap_left": 1,
+            "bitmap_top": 32,
+            "char": 82,
+            "height": 33,
+            "width": 30,
+            "x_offset": 125,
+            "y_offset": 172
+        },
+        {
+            "advance": 1536,
+            "bitmap_left": 2,
+            "bitmap_top": 33,
+            "char": 83,
+            "height": 34,
+            "width": 20,
+            "x_offset": 155,
+            "y_offset": 172
+        },
+        {
+            "advance": 1856,
+            "bitmap_left": 0,
+            "bitmap_top": 32,
+            "char": 84,
+            "height": 33,
+            "width": 29,
+            "x_offset": 175,
+            "y_offset": 172
+        },
+        {
+            "advance": 2176,
+            "bitmap_left": 1,
+            "bitmap_top": 32,
+            "char": 85,
+            "height": 33,
+            "width": 33,
+            "x_offset": 204,
+            "y_offset": 172
+        },
+        {
+            "advance": 1920,
+            "bitmap_left": -1,
+            "bitmap_top": 32,
+            "char": 86,
+            "height": 33,
+            "width": 32,
+            "x_offset": 0,
+            "y_offset": 215
+        },
+        {
+            "advance": 2688,
+            "bitmap_left": -1,
+            "bitmap_top": 32,
+            "char": 87,
+            "height": 33,
+            "width": 44,
+            "x_offset": 32,
+            "y_offset": 215
+        },
+        {
+            "advance": 1984,
+            "bitmap_left": -1,
+            "bitmap_top": 32,
+            "char": 88,
+            "height": 33,
+            "width": 33,
+            "x_offset": 76,
+            "y_offset": 215
+        },
+        {
+            "advance": 1792,
+            "bitmap_left": -1,
+            "bitmap_top": 32,
+            "char": 89,
+            "height": 33,
+            "width": 30,
+            "x_offset": 109,
+            "y_offset": 215
+        },
+        {
+            "advance": 1920,
+            "bitmap_left": 1,
+            "bitmap_top": 32,
+            "char": 90,
+            "height": 32,
+            "width": 28,
+            "x_offset": 139,
+            "y_offset": 215
+        },
+        {
+            "advance": 1664,
+            "bitmap_left": 2,
+            "bitmap_top": 31,
+            "char": 48,
+            "height": 32,
+            "width": 21,
+            "x_offset": 167,
+            "y_offset": 215
+        },
+        {
+            "advance": 1664,
+            "bitmap_left": 6,
+            "bitmap_top": 31,
+            "char": 49,
+            "height": 32,
+            "width": 13,
+            "x_offset": 188,
+            "y_offset": 215
+        },
+        {
+            "advance": 1664,
+            "bitmap_left": 3,
+            "bitmap_top": 31,
+            "char": 50,
+            "height": 31,
+            "width": 20,
+            "x_offset": 201,
+            "y_offset": 215
+        },
+        {
+            "advance": 1664,
+            "bitmap_left": 3,
+            "bitmap_top": 31,
+            "char": 51,
+            "height": 32,
+            "width": 19,
+            "x_offset": 221,
+            "y_offset": 215
+        },
+        {
+            "advance": 1664,
+            "bitmap_left": 2,
+            "bitmap_top": 31,
+            "char": 52,
+            "height": 32,
+            "width": 22,
+            "x_offset": 0,
+            "y_offset": 258
+        },
+        {
+            "advance": 1664,
+            "bitmap_left": 3,
+            "bitmap_top": 31,
+            "char": 53,
+            "height": 32,
+            "width": 19,
+            "x_offset": 22,
+            "y_offset": 258
+        },
+        {
+            "advance": 1664,
+            "bitmap_left": 3,
+            "bitmap_top": 31,
+            "char": 54,
+            "height": 32,
+            "width": 20,
+            "x_offset": 41,
+            "y_offset": 258
+        },
+        {
+            "advance": 1664,
+            "bitmap_left": 2,
+            "bitmap_top": 30,
+            "char": 55,
+            "height": 31,
+            "width": 21,
+            "x_offset": 61,
+            "y_offset": 258
+        },
+        {
+            "advance": 1664,
+            "bitmap_left": 3,
+            "bitmap_top": 31,
+            "char": 56,
+            "height": 32,
+            "width": 19,
+            "x_offset": 82,
+            "y_offset": 258
+        },
+        {
+            "advance": 1664,
+            "bitmap_left": 3,
+            "bitmap_top": 31,
+            "char": 57,
+            "height": 32,
+            "width": 20,
+            "x_offset": 101,
+            "y_offset": 258
+        },
+        {
+            "advance": 704,
+            "bitmap_left": 3,
+            "bitmap_top": 31,
+            "char": 33,
+            "height": 32,
+            "width": 6,
+            "x_offset": 121,
+            "y_offset": 258
+        },
+        {
+            "advance": 832,
+            "bitmap_left": 1,
+            "bitmap_top": 33,
+            "char": 34,
+            "height": 11,
+            "width": 11,
+            "x_offset": 127,
+            "y_offset": 258
+        },
+        {
+            "advance": 2240,
+            "bitmap_left": 2,
+            "bitmap_top": 28,
+            "char": 64,
+            "height": 35,
+            "width": 32,
+            "x_offset": 138,
+            "y_offset": 258
+        },
+        {
+            "advance": 1472,
+            "bitmap_left": 2,
+            "bitmap_top": 25,
+            "char": 35,
+            "height": 22,
+            "width": 19,
+            "x_offset": 170,
+            "y_offset": 258
+        },
+        {
+            "advance": 1472,
+            "bitmap_left": 2,
+            "bitmap_top": 33,
+            "char": 36,
+            "height": 36,
+            "width": 19,
+            "x_offset": 189,
+            "y_offset": 258
+        },
+        {
+            "advance": 1984,
+            "bitmap_left": 1,
+            "bitmap_top": 31,
+            "char": 37,
+            "height": 32,
+            "width": 29,
+            "x_offset": 208,
+            "y_offset": 258
+        },
+        {
+            "advance": 2048,
+            "bitmap_left": 2,
+            "bitmap_top": 31,
+            "char": 38,
+            "height": 32,
+            "width": 29,
+            "x_offset": 0,
+            "y_offset": 301
+        },
+        {
+            "advance": 512,
+            "bitmap_left": 1,
+            "bitmap_top": 33,
+            "char": 39,
+            "height": 11,
+            "width": 5,
+            "x_offset": 29,
+            "y_offset": 301
+        },
+        {
+            "advance": 1344,
+            "bitmap_left": 1,
+            "bitmap_top": 32,
+            "char": 42,
+            "height": 19,
+            "width": 18,
+            "x_offset": 34,
+            "y_offset": 301
+        },
+        {
+            "advance": 1600,
+            "bitmap_left": 1,
+            "bitmap_top": 23,
+            "char": 43,
+            "height": 23,
+            "width": 23,
+            "x_offset": 52,
+            "y_offset": 301
+        },
+        {
+            "advance": 768,
+            "bitmap_left": 1,
+            "bitmap_top": 34,
+            "char": 40,
+            "height": 42,
+            "width": 12,
+            "x_offset": 75,
+            "y_offset": 301
+        },
+        {
+            "advance": 768,
+            "bitmap_left": 0,
+            "bitmap_top": 34,
+            "char": 41,
+            "height": 42,
+            "width": 11,
+            "x_offset": 87,
+            "y_offset": 301
+        },
+        {
+            "advance": 768,
+            "bitmap_left": 3,
+            "bitmap_top": 34,
+            "char": 91,
+            "height": 41,
+            "width": 10,
+            "x_offset": 98,
+            "y_offset": 301
+        },
+        {
+            "advance": 768,
+            "bitmap_left": 0,
+            "bitmap_top": 34,
+            "char": 93,
+            "height": 41,
+            "width": 9,
+            "x_offset": 108,
+            "y_offset": 301
+        },
+        {
+            "advance": 640,
+            "bitmap_left": 1,
+            "bitmap_top": 34,
+            "char": 123,
+            "height": 41,
+            "width": 8,
+            "x_offset": 117,
+            "y_offset": 301
+        },
+        {
+            "advance": 640,
+            "bitmap_left": 1,
+            "bitmap_top": 34,
+            "char": 125,
+            "height": 41,
+            "width": 9,
+            "x_offset": 125,
+            "y_offset": 301
+        },
+        {
+            "advance": 1472,
+            "bitmap_left": 1,
+            "bitmap_top": 21,
+            "char": 60,
+            "height": 22,
+            "width": 20,
+            "x_offset": 134,
+            "y_offset": 301
+        },
+        {
+            "advance": 1472,
+            "bitmap_left": 2,
+            "bitmap_top": 21,
+            "char": 62,
+            "height": 22,
+            "width": 20,
+            "x_offset": 154,
+            "y_offset": 301
+        },
+        {
+            "advance": 576,
+            "bitmap_left": 0,
+            "bitmap_top": 7,
+            "char": 44,
+            "height": 14,
+            "width": 8,
+            "x_offset": 174,
+            "y_offset": 301
+        },
+        {
+            "advance": 1152,
+            "bitmap_left": 2,
+            "bitmap_top": 13,
+            "char": 45,
+            "height": 4,
+            "width": 13,
+            "x_offset": 182,
+            "y_offset": 301
+        },
+        {
+            "advance": 640,
+            "bitmap_left": 2,
+            "bitmap_top": 5,
+            "char": 46,
+            "height": 6,
+            "width": 6,
+            "x_offset": 195,
+            "y_offset": 301
+        },
+        {
+            "advance": 1216,
+            "bitmap_left": 1,
+            "bitmap_top": 36,
+            "char": 47,
+            "height": 38,
+            "width": 17,
+            "x_offset": 201,
+            "y_offset": 301
+        },
+        {
+            "advance": 704,
+            "bitmap_left": 2,
+            "bitmap_top": 21,
+            "char": 58,
+            "height": 22,
+            "width": 6,
+            "x_offset": 218,
+            "y_offset": 301
+        },
+        {
+            "advance": 704,
+            "bitmap_left": 1,
+            "bitmap_top": 21,
+            "char": 59,
+            "height": 28,
+            "width": 8,
+            "x_offset": 224,
+            "y_offset": 301
+        },
+        {
+            "advance": 1472,
+            "bitmap_left": 1,
+            "bitmap_top": 21,
+            "char": 60,
+            "height": 22,
+            "width": 20,
+            "x_offset": 0,
+            "y_offset": 344
+        },
+        {
+            "advance": 1664,
+            "bitmap_left": 3,
+            "bitmap_top": 15,
+            "char": 61,
+            "height": 10,
+            "width": 21,
+            "x_offset": 20,
+            "y_offset": 344
+        },
+        {
+            "advance": 1472,
+            "bitmap_left": 2,
+            "bitmap_top": 21,
+            "char": 62,
+            "height": 22,
+            "width": 20,
+            "x_offset": 41,
+            "y_offset": 344
+        },
+        {
+            "advance": 1088,
+            "bitmap_left": 2,
+            "bitmap_top": 31,
+            "char": 63,
+            "height": 32,
+            "width": 13,
+            "x_offset": 61,
+            "y_offset": 344
+        },
+        {
+            "advance": 1536,
+            "bitmap_left": 0,
+            "bitmap_top": 1,
+            "char": 95,
+            "height": 4,
+            "width": 23,
+            "x_offset": 74,
+            "y_offset": 344
+        },
+        {
+            "advance": 1024,
+            "bitmap_left": 5,
+            "bitmap_top": 32,
+            "char": 96,
+            "height": 8,
+            "width": 8,
+            "x_offset": 97,
+            "y_offset": 344
+        },
+        {
+            "advance": 640,
+            "bitmap_left": 3,
+            "bitmap_top": 37,
+            "char": 124,
+            "height": 43,
+            "width": 4,
+            "x_offset": 105,
+            "y_offset": 344
+        },
+        {
+            "advance": 1728,
+            "bitmap_left": 2,
+            "bitmap_top": 17,
+            "char": 126,
+            "height": 7,
+            "width": 23,
+            "x_offset": 109,
+            "y_offset": 344
+        },
+        {
+            "advance": 896,
+            "bitmap_left": 0,
+            "bitmap_top": 0,
+            "char": 32,
+            "height": 0,
+            "width": 0,
+            "x_offset": 132,
+            "y_offset": 344
+        },
+        {
+            "advance": 1216,
+            "bitmap_left": 1,
+            "bitmap_top": 36,
+            "char": 92,
+            "height": 38,
+            "width": 17,
+            "x_offset": 132,
+            "y_offset": 344
+        },
+        {
+            "advance": 1152,
+            "bitmap_left": 2,
+            "bitmap_top": 31,
+            "char": 94,
+            "height": 12,
+            "width": 13,
+            "x_offset": 149,
+            "y_offset": 344
+        }
+    ],
+    "characters": "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!\"@#$%&'*+()[]{}<>,-./:;<=>?_`|~ \\^",
+    "characters_count": 97,
+    "font_name": "AmiriRegular",
+    "line_height": 43,
+    "pixel_size": 48,
+    "texture_height": 387,
+    "texture_width": 387
+}

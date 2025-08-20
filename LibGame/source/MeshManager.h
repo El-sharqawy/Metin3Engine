@@ -14,6 +14,7 @@
 
 class CMesh;
 class CPhysicsObject;
+class CTerrainManager;
 
 struct SMeshVertex;
 struct SMeshEntry;
@@ -92,7 +93,7 @@ public:
 	std::shared_ptr<CMesh> GetMesh(const std::string& stMeshName);
 
 	// Render a Single Mesh
-	void RenderMesh(const std::string& stMeshName);
+	void RenderSingleInstance(const std::string& stMeshName, const CMatrix4Df& matWorld, const CMatrix4Df& matWVP);
 
 	// Render a Mesh Instanced
 	void RenderMeshInstanced(const std::string& stMeshName, GLuint uiNumInstances, const std::vector<CMatrix4Df>& matWorld, const std::vector<CMatrix4Df>& matWVP);
@@ -102,7 +103,7 @@ public:
 	bool RemoveMeshToJson(const std::string& stMeshesFilePath, const std::string stMeshName);
 	bool LoadMeshesFromJson(const std::string& stMeshesFilePath);
 	bool SaveMeshesToJson(const std::string& stMeshesFilePath);
-	void RenderMeshEditorUI();
+	void RenderMeshEditorUI(CTerrainManager* pTerrainManager);
 
 	bool LoadMesh(const std::string& stMeshName);
 	const SMeshInfo& GetMeshInfo(const std::string& stMeshName);

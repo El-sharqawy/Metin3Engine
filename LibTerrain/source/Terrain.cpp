@@ -2868,23 +2868,42 @@ void CTerrain::PutTerrainHeightMap(GLfloat fX, GLfloat fZ, GLfloat fValue, bool 
 }
 
 // Terrain Pool
+
 CDynamicPool<CTerrain> CTerrain::ms_TerrainPool;
 
+/**
+ * DestroySystem - Releases all memory held by the terrain pool.
+ *
+ * This should be called once at application shutdown.
+ */
 void CTerrain::DestroySystem()
 {
 	ms_TerrainPool.Destroy();
 }
 
+/**
+ * New - Creates a new CTerrain instance using the memory pool.
+ *
+ * Return: A shared_ptr to the newly created CTerrain object.
+ */
 CTerrain* CTerrain::New()
 {
 	return (ms_TerrainPool.Alloc());
 }
 
+/**
+ * Delete - Destroys a CTerrain instance and returns its memory to the pool.
+ * @pTerrain: A raw pointer to the terrain object to be recycled.
+ *
+ * IMPORTANT: You are now manually responsible for calling this for every
+ * object created with New(). Forgetting to do so will cause a memory leak.
+ */
 void CTerrain::Delete(CTerrain* pTerrain)
 {
 	pTerrain->Clear();
 	ms_TerrainPool.Free(pTerrain);
 }
+
 
 // Textureset
 CTerrainTextureset* CTerrain::ms_pTerrainTextureset = nullptr;

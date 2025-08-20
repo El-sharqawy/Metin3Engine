@@ -8,6 +8,8 @@
 #include "../../LibGame/source/ResourcesManager.h"
 #include "../../LibGame/source/PhysicsWorld.h"
 #include "../../LibGame/source/MeshManager.h"
+#include "../../LibGame/source/FontsManager.h"
+#include "../../LibGame/source/Mesh2D.h"
 
 constexpr auto DEFAULT_WINDOW_WIDTH = 1260;
 constexpr auto DEFAULT_WINDOW_HEIGHT = 960;
@@ -78,6 +80,9 @@ protected:
 	void UpdateScreen();
 	void UpdateRenderSkyBox();
 	void UpdateRenderTerrain(GLfloat fDeltaTime);
+
+	void UpdateAndRenderText();
+
 	void UpdateRenderWindow();
 
 	void CheckMouseButtons();
@@ -86,7 +91,8 @@ public: // Singleton Classes
 	CCameraManager camera_manager;
 	CResourcesManager resources_manager;
 	CPhysicsWorld physics_world;
-	CMeshManager meshManager;
+	CMeshManager mesh_manager;
+	CFontManager font_manager;
 
 private:
 	// Window properties

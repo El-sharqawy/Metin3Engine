@@ -142,7 +142,9 @@
   <ItemGroup>
     <ClInclude Include="source\BoundingBox.h" />
     <ClInclude Include="source\CRC32.h" />
+    <ClInclude Include="source\FontsManager.h" />
     <ClInclude Include="source\Mesh.h" />
+    <ClInclude Include="source\Mesh2D.h" />
     <ClInclude Include="source\MeshManager.h" />
     <ClInclude Include="source\MeshTexture.h" />
     <ClInclude Include="source\Model.h" />
@@ -158,7 +160,9 @@
   <ItemGroup>
     <ClCompile Include="source\BoundingBox.cpp" />
     <ClCompile Include="source\CRC32.cpp" />
+    <ClCompile Include="source\FontsManager.cpp" />
     <ClCompile Include="source\Mesh.cpp" />
+    <ClCompile Include="source\Mesh2D.cpp" />
     <ClCompile Include="source\MeshManager.cpp" />
     <ClCompile Include="source\MeshTexture.cpp" />
     <ClCompile Include="source\Model.cpp" />

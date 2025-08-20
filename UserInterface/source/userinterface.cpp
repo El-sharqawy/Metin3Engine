@@ -660,15 +660,28 @@ void CUserInterface::RenderObjectsControlUI()
 			ImGui::TextColored(ImVec4(1, 1, 1, 1), "Object Properties");
 			ImGui::SliderFloat3("Object Position", (float*)&pTerrainManager->GetCurrentPickedObject()->GetPosition()[0], 0.0f, 1000.0f);
 			ImGui::SliderFloat3("Object Rotation", (float*)&pTerrainManager->GetCurrentPickedObject()->GetRotation()[0], 0.0f, 1000.0f);
-			ImGui::SliderFloat3("Object Scale", (float*)&pTerrainManager->GetCurrentPickedObject()->GetScale()[0], 0.0f, 1.0f);
+			ImGui::SliderFloat3("Object Scale", (float*)&pTerrainManager->GetCurrentPickedObject()->GetScale()[0], 0.0f, 0.1f);
+
+			if (ImGui::Button("Delete Object", buttonSize))
+			{
+				pTerrainManager->DeleteObject();
+			}
 		}
 	}
 }
 
 void CUserInterface::RenderObjectsManagementUI()
 {
+	static CTerrainManager* pTerrainManager = m_pWindow->GetTerrainManager();
+
+	if (pTerrainManager->IsMapReady() == false)
+	{
+		ImGui::TextColored(ImVec4(1, 0, 0, 1), "You need to Load Map First.");
+		return;
+	}
+
 	CMeshManager* pMeshManager = CMeshManager::InstancePtr();
-	pMeshManager->RenderMeshEditorUI();
+	pMeshManager->RenderMeshEditorUI(pTerrainManager);
 }
 
 void CUserInterface::Render()
@@ -707,6 +720,24 @@ void CUserInterface::Render()
 		}
 
 		ImGui::EndTabBar();
+	}
+
+	auto fontTexture = CFontManager::Instance().GetFontPtr("StandardFont");
+	if (fontTexture)
+	{
+		if (fontTexture->pTexture->GetTextureID())
+		{
+			ImGui::Image((ImTextureID)(intptr_t)fontTexture->pTexture->GetTextureID(), ImVec2(128, 128), ImVec2(0, 0), ImVec2(1, 1), ImVec4(1, 1, 1, 1), ImVec4(1, 1, 1, 0.5));
+		}
+	}
+
+	auto AmiriFontTexture = CFontManager::Instance().GetFontPtr("AmiriRegular");
+	if (AmiriFontTexture)
+	{
+		if (AmiriFontTexture->pTexture->GetTextureID())
+		{
+			ImGui::Image((ImTextureID)(intptr_t)AmiriFontTexture->pTexture->GetTextureID(), ImVec2(512, 512), ImVec2(0, 0), ImVec2(1, 1), ImVec4(1, 1, 1, 1), ImVec4(1, 1, 1, 0.5));
+		}
 	}
 
 	/*auto reflectionTex = m_pWindow->GetTerrainManager()->GetTerrainMapPtr()->GetReflectionFBOPtr();

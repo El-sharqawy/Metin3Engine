@@ -4,6 +4,7 @@
 #include "Textureset.h"
 #include "Dynamic.h"
 #include "../../LibMath/source/grid.h"
+#include "SmartDynamic.h"
 
 class CTerrainMap;
 
@@ -178,6 +179,7 @@ protected:
 
 	// Terrains Dynamic Pool
 public:
+	// Dynamic Pool
 	static void DestroySystem();
 	static CTerrain* New();
 	static void Delete(CTerrain* pTerrain);

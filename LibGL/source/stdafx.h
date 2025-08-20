@@ -38,6 +38,20 @@
 #define DEFAULT_WINDOW_WIDTH 1600
 #define DEFAULT_WINDOW_HEIGHT 960
 
+#pragma comment(lib, "glfw3.lib")
+#if defined(_DEBUG)
+#pragma comment(lib, "Debug/assimp-vc143-mtd.lib")
+#pragma comment(lib, "Debug/zlibstaticd.lib")
+#pragma comment(lib, "Debug/meshoptimizer_mtd.lib")
+#pragma comment(lib, "Debug/freetype.lib")
+// #pragma comment(lib, "Debug/freetypegl.lib")
+#else
+#pragma comment(lib, "Release/assimp-vc143-mt.lib")
+#pragma comment(lib, "Release/zlibstatic.lib")
+#pragma comment(lib, "Release/meshoptimizer.lib")
+#pragma comment(lib, "Release/freetype.lib")
+// #pragma comment(lib, "Release/freetypegl.lib")
+#endif
 
 
 // add headers that you want to pre-compile here

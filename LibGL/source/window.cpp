@@ -176,6 +176,8 @@ bool CWindow::InitializeWindow(const std::string& stTitle, const GLuint& width, 
 
 	InitializeClasses();
 
+	CFontManager::Instance().SetupOpenGLFonts();
+
 	SetWindowIcon("resources/icon/terrain.png");
 	return (true);
 }
@@ -304,10 +306,6 @@ void CWindow::ProcessInput(float deltaTime)
 	{
 		SetWireFrame(!m_bIsWireFrame);
 	}
-	if (m_bKeyBools[GLFW_KEY_F5])
-	{
-		GetTerrainManager()->SaveMap();
-	}
 	if (m_bKeyBools[GLFW_KEY_F1])
 	{
 		GetCurrentCPUMemoryUsage();
@@ -316,6 +314,11 @@ void CWindow::ProcessInput(float deltaTime)
 	if (m_bKeyBools[GLFW_KEY_F2])
 	{
 		GetCamera()->SetLock(!GetCamera()->IsLocked());
+	}
+
+	if (m_bKeyBools[GLFW_KEY_F3])
+	{
+		GetTerrainManager()->SaveMap();
 	}
 }
 
@@ -349,10 +352,11 @@ void CWindow::PrintGPUMemoryUsage_AMD()
 void CWindow::InitializeClasses()
 {
 	CMeshManager::Instance().LoadMeshesFromJson("resources/data/game_meshes.json");
+	CResourcesManager::Instance().LoadShaderDefinitions("resources/data/game_shaders.json");
 
 	m_pTerrainManager = new CTerrainManager;
 	m_pTerrainManager->Create();
-	m_pTerrainManager->LoadMap("metin3_map_4v4");
+	//m_pTerrainManager->LoadMap("metin3_map_4v4");
 
 	m_pScreen = new CScreen;
 	m_pScreen->SetTerrainManager(m_pTerrainManager);
@@ -557,6 +561,15 @@ void CWindow::Update(GLfloat fDeltaTime)
 	UpdateRenderSkyBox();
 	UpdateRenderTerrain(fDeltaTime);
 
+	UpdateAndRenderText();
+
+	//char c_szPlayerPosition[256];
+	//SVector3Df v3PlayerPos = GetCamera()->GetPosition();
+
+	//sprintf_s(c_szPlayerPosition, "Camera Position: (%.2f, %.2f, %.2f)", v3PlayerPos.x, v3PlayerPos.y, v3PlayerPos.z);
+
+	//RenderText(c_szPlayerPosition, 25.0f, 800.0f, 1.0f, glm::vec3(0.5, 0.3f, 1.0f));
+
 	m_pFrameBufObj->UnBindWriting();
 
 	// Render the screen space shader that is written to our frame buffer
@@ -615,9 +628,25 @@ void CWindow::UpdateRenderTerrain(GLfloat fDeltaTime)
 		// Update Physics World
 		CPhysicsWorld::Instance().Update(fDeltaTime);
 
+		m_pTerrainManager->Update();
 		m_pTerrainManager->GetMapRef().UpdateMapAreas();
 		m_pTerrainManager->GetMapRef().Render(fDeltaTime);
 	}
+}
+
+void CWindow::UpdateAndRenderText()
+{
+	m_pFrameBufObj->BindForWriting();
+
+	char c_szPlayerPosition[256];
+	SVector3Df v3PlayerPos = GetCamera()->GetPosition();
+	std::string stColor = "[COL=1.0,0.5,0.0,1.0]";
+	sprintf_s(c_szPlayerPosition, "Camera Position: %s (%.2f, %.2f, %.2f)", stColor.c_str(), v3PlayerPos.x, v3PlayerPos.y, v3PlayerPos.z);
+
+	CFontManager::Instance().RenderText("[COL=0.2,0.3,1.0,1.0]Metin3Engine", "AmiriRegular", 50, 30, SVector2Di(GetWidth(), GetHeight()), EAlignment::ALIGN_TOP_LEFT, 1.0f, 0, true);
+	CFontManager::Instance().RenderText(c_szPlayerPosition, "AmiriRegular", 50, 80, SVector2Di(GetWidth(), GetHeight()), EAlignment::ALIGN_TOP_LEFT, 1.0f, 0, true);
+
+	m_pFrameBufObj->UnBindWriting();
 }
 
 void CWindow::UpdateRenderWindow()
@@ -670,7 +699,7 @@ void CWindow::CheckMouseButtons()
 
 	// Left-click actions
 	if (m_bLeftMousePressed)
-	{
+	{	
 		if (m_pTerrainManager->IsEditingTerrain())
 		{
 			m_pTerrainManager->UpdateEditing();
@@ -691,6 +720,10 @@ void CWindow::CheckMouseButtons()
 				// Grab a new object
 				m_pTerrainManager->GrabObject();
 			}
+		}
+		else if (m_pTerrainManager->IsPlacingObject())
+		{
+			m_pTerrainManager->AddObject();
 		}
 	}
 }

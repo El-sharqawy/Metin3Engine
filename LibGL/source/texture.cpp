@@ -94,7 +94,7 @@ void CTexture::Load(GLuint uiBufferSize, void* pImageData)
 	stbi_image_free(pImageLoadedData);
 }
 
-void CTexture::Load(const std::string& stFileName, bool bBindless)
+bool CTexture::Load(const std::string& stFileName, bool bBindless)
 {
 	m_strFullTexturePath = stFileName;
 	m_fsFilePath = stFileName;
@@ -109,7 +109,10 @@ void CTexture::Load(const std::string& stFileName, bool bBindless)
 	if (!Load(bBindless))
 	{
 		sys_err("CTexture::Load Failed to load texture: '%s'\n", stFileName.c_str());
+		return (false);
 	}
+
+	return (true);
 }
 
 void CTexture::LoadRaw(GLint iWidth, GLint iHeight, GLint iChannelsBPP, unsigned char* pImageData)
@@ -221,7 +224,10 @@ void CTexture::LoadInternal(void* pImageData)
 
 void CTexture::LoadInternalDSA(void* pImageData)
 {
-	glCreateTextures(m_eTextureTarget, 1, &m_uiTextureID);
+	if (!m_uiTextureID)
+	{
+		glCreateTextures(m_eTextureTarget, 1, &m_uiTextureID);
+	}
 
 	GLint iLevels = std::min(5, (GLint)std::log2f((GLfloat)std::max(m_iWidth, m_iHeight)));
 	GLint SwizzleMask[] = { GL_RED, GL_RED, GL_RED, GL_RED };
@@ -268,7 +274,11 @@ void CTexture::LoadInternalDSA(void* pImageData)
 
 void CTexture::LoadInternalNonDSA(void* pImageData)
 {
-	glGenTextures(1, &m_uiTextureID);
+	if (!m_uiTextureID)
+	{
+		glGenTextures(1, &m_uiTextureID);
+	}
+
 	glBindTexture(m_eTextureTarget, m_uiTextureID);
 
 	if (m_eTextureTarget == GL_TEXTURE_2D)
