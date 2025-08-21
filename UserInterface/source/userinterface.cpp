@@ -15,6 +15,8 @@
 #undef minmax
 #endif
 
+#define ENGINE_VERSION "Terrain Engine v2.0.0"
+
 CUserInterface::CUserInterface(CWindow* pWindow)
 {
 	// Setup Dear ImGui context
@@ -58,6 +60,8 @@ CUserInterface::~CUserInterface()
 
 void CUserInterface::Destroy()
 {
+	Discord_Close();
+
 	ImGui_ImplOpenGL3_Shutdown();
 	ImGui_ImplGlfw_Shutdown();
 	ImGui::DestroyContext();
@@ -101,6 +105,8 @@ void CUserInterface::RenderMapsUI()
 	{
 		m_pWindow->SetWireFrame(bIsWireFrame);
 	}
+
+	CSkyBox::Instance().SetGUI();
 }
 
 void CUserInterface::RenderCreateNewMapPopUP(bool& showPopup, CTerrainManager* pTerrainManager)
@@ -114,7 +120,7 @@ void CUserInterface::RenderCreateNewMapPopUP(bool& showPopup, CTerrainManager* p
 	{
 		ImGui::TextWrapped("Create a new terrain map. Map name must be unique.");
 
-		static char m_strName[256] = "metin3_map_new";
+		static char m_strName[256] = "map_new";
 		static GLint iMapSizeX = 1;
 		static GLint iMapSizeZ = 1;
 
@@ -197,7 +203,7 @@ void CUserInterface::RenderLoadMapPopUP(bool& showPopup, CTerrainManager* pTerra
 	{
 		ImGui::TextWrapped("Load Map. write it's name in the text box");
 
-		static char m_strName[256] = "metin3_map_new";
+		static char m_strName[256] = "map_new";
 
 		ImGui::InputText("Map Name", m_strName, IM_ARRAYSIZE(m_strName));
 
@@ -249,7 +255,6 @@ void CUserInterface::RenderLoadMapPopUP(bool& showPopup, CTerrainManager* pTerra
 
 		ImGui::EndPopup();
 	}
-
 }
 
 void CUserInterface::RenderTerrainUI()
@@ -478,7 +483,7 @@ void CUserInterface::RenderTerrainUI()
 
 					// Define our base directory. This is the part we want to remove.
 					// In this case, it's the root of our project.
-					std::filesystem::path baseDir = "G:/Projects/Metin3Engine/UserInterface/";
+					std::filesystem::path baseDir = "G:/Projects/TerrainEngine/UserInterface/";
 
 					// Create filesystem path objects for easier manipulation
 					std::filesystem::path fullPath(filePathName);
@@ -619,10 +624,50 @@ void CUserInterface::RenderTerrainUI()
 	}
 }
 
-void CUserInterface::RenderSkyBoxUI()
+void CUserInterface::RenderEngineDataUI()
 {
-	CSkyBox::Instance().SetGUI();
+	ImGui::Text("Engine Version: %s", ENGINE_VERSION);
+	ImGui::Text("Build Date: %s", __DATE__);
+	ImGui::Text("Build Time: %s", __TIME__);
+	ImGui::Separator();
+	// Show Discord Rich Presence
+	if (ImGui::Checkbox("Show Discord Rich Presence", &m_bShowDiscordApp))
+	{
+	}
+
+	// Show the list of loaded meshes
+	auto& vLoadedMeshes = CMeshManager::Instance().GetLoadedMeshes();
+	auto& vLoadedShaders = CResourcesManager::Instance().GetShaders();
+
+	// Create a vector of mesh names for the ListBox
+	std::vector<const char*> meshesNames;
+	for (const auto& [meshName, meshInfo] : vLoadedMeshes)
+	{
+		meshesNames.push_back(meshName.c_str());
+	}
+
+	// Create a vector of shader names for the ListBox
+	std::vector<const char*> shadersNames;
+	for (const auto& [shaderName, shaderInfo] : vLoadedShaders)
+	{
+		shadersNames.push_back(shaderName.c_str());
+	}
+	static GLint selectedMesh = -1;
+	static GLint selectedShader = -1;
+
+	ImGui::Text("Loaded Meshes:");
+	ImGui::PushItemWidth(200.0f); // Set width to 200 pixels
+	ImGui::ListBox("##meshes_list", &selectedMesh, meshesNames.data(), meshesNames.size(), 7);
+	ImGui::PopItemWidth(); // Restore default item width
+
+	ImGui::NewLine();
+	ImGui::Text("Loaded Shaders:");
+	ImGui::PushItemWidth(200.0f); // Set width to 200 pixels
+	ImGui::ListBox("##shaders_list", &selectedShader, shadersNames.data(), shadersNames.size(), 7);
+	ImGui::PopItemWidth(); // Restore default item width
+
 }
+
 void CUserInterface::RenderObjectsControlUI()
 {
 	static CTerrainManager* pTerrainManager = m_pWindow->GetTerrainManager();
@@ -689,6 +734,12 @@ void CUserInterface::Render()
 	ImGui::Begin("Terrain Tools");
 	if (ImGui::BeginTabBar("##MainEditorTabs", ImGuiTabBarFlags_None))
 	{
+		if (ImGui::BeginTabItem("Engine"))
+		{
+			RenderEngineDataUI();
+			ImGui::EndTabItem();
+		}
+
 		if (ImGui::BeginTabItem("Map"))
 		{
 			RenderMapsUI();
@@ -713,31 +764,7 @@ void CUserInterface::Render()
 			ImGui::EndTabItem();
 		}
 
-		if (ImGui::BeginTabItem("SkyBox"))
-		{
-			RenderSkyBoxUI();
-			ImGui::EndTabItem();
-		}
-
 		ImGui::EndTabBar();
-	}
-
-	auto fontTexture = CFontManager::Instance().GetFontPtr("StandardFont");
-	if (fontTexture)
-	{
-		if (fontTexture->pTexture->GetTextureID())
-		{
-			ImGui::Image((ImTextureID)(intptr_t)fontTexture->pTexture->GetTextureID(), ImVec2(128, 128), ImVec2(0, 0), ImVec2(1, 1), ImVec4(1, 1, 1, 1), ImVec4(1, 1, 1, 0.5));
-		}
-	}
-
-	auto AmiriFontTexture = CFontManager::Instance().GetFontPtr("AmiriRegular");
-	if (AmiriFontTexture)
-	{
-		if (AmiriFontTexture->pTexture->GetTextureID())
-		{
-			ImGui::Image((ImTextureID)(intptr_t)AmiriFontTexture->pTexture->GetTextureID(), ImVec2(512, 512), ImVec2(0, 0), ImVec2(1, 1), ImVec4(1, 1, 1, 1), ImVec4(1, 1, 1, 0.5));
-		}
 	}
 
 	/*auto reflectionTex = m_pWindow->GetTerrainManager()->GetTerrainMapPtr()->GetReflectionFBOPtr();
@@ -907,6 +934,10 @@ void CUserInterface::Update()
 		ImGui::Text("Developed by:");
 		ImGui::BulletText("Osama Elsharqawy");
 		ImGui::BulletText("elsharqawy2@gmail.com");
+
+		ImGui::BulletText("Terrain Engine - A Terrains Creator Engine");
+		ImGui::BulletText("Developed by: Osama Elsharqawy");
+		ImGui::BulletText("Version: %s", ENGINE_VERSION);
 
 		// GitHub link
 		ImGui::Spacing();

@@ -25,8 +25,8 @@ public:
 	void RenderCreateNewMapPopUP(bool& showPopup, CTerrainManager* pTerrainManager);
 	void RenderLoadMapPopUP(bool& showPopup, CTerrainManager* pTerrainManager);
 
+	void RenderEngineDataUI();
 	void RenderTerrainUI();
-	void RenderSkyBoxUI();
 	void RenderObjectsControlUI();
 	void RenderObjectsManagementUI();
 

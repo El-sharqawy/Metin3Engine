@@ -356,7 +356,7 @@ void CWindow::InitializeClasses()
 
 	m_pTerrainManager = new CTerrainManager;
 	m_pTerrainManager->Create();
-	//m_pTerrainManager->LoadMap("metin3_map_4v4");
+	//m_pTerrainManager->LoadMap("map_4v4");
 
 	m_pScreen = new CScreen;
 	m_pScreen->SetTerrainManager(m_pTerrainManager);
@@ -441,7 +441,6 @@ void CWindow::Destroy()
 	safe_delete(m_pScreenSpaceShader);
 
 	// Destroy the user interface
-	m_pUserInterface->Discord_Close();
 	safe_delete(m_pUserInterface);
 
 	// Destroy the window and its resources
@@ -643,8 +642,8 @@ void CWindow::UpdateAndRenderText()
 	std::string stColor = "[COL=1.0,0.5,0.0,1.0]";
 	sprintf_s(c_szPlayerPosition, "Camera Position: %s (%.2f, %.2f, %.2f)", stColor.c_str(), v3PlayerPos.x, v3PlayerPos.y, v3PlayerPos.z);
 
-	CFontManager::Instance().RenderText("[COL=0.2,0.3,1.0,1.0]Metin3Engine", "AmiriRegular", 50, 30, SVector2Di(GetWidth(), GetHeight()), EAlignment::ALIGN_TOP_LEFT, 1.0f, 0, true);
-	CFontManager::Instance().RenderText(c_szPlayerPosition, "AmiriRegular", 50, 80, SVector2Di(GetWidth(), GetHeight()), EAlignment::ALIGN_TOP_LEFT, 1.0f, 0, true);
+	// CFontManager::Instance().RenderText("[COL=0.2,0.3,1.0,1.0]TerrainEngine", "AmiriRegular", 50, 30, SVector2Di(GetWidth(), GetHeight()), EAlignment::ALIGN_TOP_LEFT, 1.0f, 0, true);
+	// CFontManager::Instance().RenderText(c_szPlayerPosition, "AmiriRegular", 50, 80, SVector2Di(GetWidth(), GetHeight()), EAlignment::ALIGN_TOP_LEFT, 1.0f, 0, true);
 
 	m_pFrameBufObj->UnBindWriting();
 }

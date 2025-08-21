@@ -38,6 +38,16 @@ public:
     // New function to load the shader manifest file
     bool LoadShaderDefinitions(const std::string& sDefinitionFilePath);
 
+    const std::map<std::string, SShaderProgramDefinitions>& GetShaderDefinitions() const
+    {
+        return m_mShaderDefinitions;
+	}
+
+    const std::map<std::string, std::unique_ptr<CShader>>& GetShaders() const
+    {
+        return m_mShaders;
+	}
+
 private:
     // This map stores the definitions loaded from shaders.json
     std::map<std::string, SShaderProgramDefinitions> m_mShaderDefinitions;

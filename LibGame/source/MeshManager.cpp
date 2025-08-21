@@ -601,9 +601,9 @@ void CMeshManager::RenderMeshEditorUI(CTerrainManager* pTerrainManager)
 				std::string filePathName = ImGuiFileDialog::Instance()->GetFilePathName();	// full name
 				std::string filePath = ImGuiFileDialog::Instance()->GetCurrentPath();		// just the path
 
-				// Define our base directory. This is the part we want to remove.
+				// Define your base directory. This is the part your want to remove.
 				// In this case, it's the root of our project.
-				std::filesystem::path baseDir = "G:/Projects/Metin3Engine/UserInterface/";
+				std::filesystem::path baseDir = "G:/Projects/TerrainEngine/UserInterface/";
 
 				// Create filesystem path objects for easier manipulation
 				std::filesystem::path fullPath(filePathName);
@@ -1127,4 +1127,9 @@ void CMeshManager::UpdateGlobalBuffers()
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 	}
+}
+
+const std::map<std::string, SMeshInfo>& CMeshManager::GetLoadedMeshes() const
+{
+	return (m_vLoadedMeshes);
 }

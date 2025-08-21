@@ -127,6 +127,8 @@ public:
 	void InitializeGlobalBuffers(const std::vector<SMeshVertex>& allVertices, const std::vector<GLuint>& allIndices);
 	void UpdateGlobalBuffers();
 
+	const std::map<std::string, SMeshInfo>& GetLoadedMeshes() const;
+
 private:
 	std::map<std::string, SMeshInfo> m_vLoadedMeshes; // Maps mesh names to their file paths and CRC32 hashes and physics objects
 	// Global staging buffers (CPU side)
