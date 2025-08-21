@@ -120,9 +120,9 @@ void CUserInterface::RenderCreateNewMapPopUP(bool& showPopup, CTerrainManager* p
 	{
 		ImGui::TextWrapped("Create a new terrain map. Map name must be unique.");
 
-		static char m_strName[256] = "map_new";
-		static GLint iMapSizeX = 1;
-		static GLint iMapSizeZ = 1;
+		char m_strName[256] = "map_new";
+		GLint iMapSizeX = 1;
+		GLint iMapSizeZ = 1;
 
 		ImGui::InputText("Map Name", m_strName, IM_ARRAYSIZE(m_strName));
 		ImGui::InputInt("Map X Size", &iMapSizeX);

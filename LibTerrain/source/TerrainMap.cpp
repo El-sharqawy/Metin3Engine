@@ -8,7 +8,7 @@
 
 CTerrainMap::CTerrainMap()
 {
-	Initialize();
+	// Initialize();
 }
 
 CTerrainMap::~CTerrainMap()
@@ -24,24 +24,27 @@ void CTerrainMap::Clear()
 
 void CTerrainMap::Initialize()
 {
-	m_pMapShader = nullptr;
-	m_pMapWaterShader = nullptr;
+	// Always initialize pointers to nullptr
+	m_pWaterDudvTex = nullptr;
+	m_pWaterNormalTex = nullptr;
+	m_pReflectionFBO = nullptr;
+	m_pRefractionFBO = nullptr;
 
+	// The rest of initializations
 	m_iTerrainCountX = m_iTerrainCountZ = 0;
 	m_iNumTerrains = 0;
 	m_iNumAreas = 0;
-
 	m_uiTerrainHandlesSSBO = 0;
-	m_sUploadedTextureCount = 0; // Track New Textures
-	m_sAllocatedSSBOSlots = 0; // Track New Textures
+	m_sUploadedTextureCount = 0;
+	m_sAllocatedSSBOSlots = 0;
 	m_vTextureHandles.clear();
+	m_vLoadedTerrains.clear();
+	m_vLoadedAreas.clear();
 
-	// Terrain Brushes Part
 	m_iBrushStrength = 1;
 	m_iBrushMaxStrength = 250;
 	m_iBrushSize = 1;
 	m_iBrushMaxSize = 250;
-
 }
 
 void CTerrainMap::Destroy()

@@ -1169,7 +1169,7 @@ void CTerrain::RenderTerrainRefractionPass(float fWaterHeight)
 
 void CTerrain::RenderPatches(const CCamera& renderCam, const SVector4Df& v4ClipPlane)
 {
-	CShader* pShader = m_pOwnerTerrainMap->GetTerrainShaderPtr();
+	CShader* pShader = CResourcesManager::Instance().GetShader("TessellatedMapTerrain");
 	pShader->Use();
 
 	CMatrix4Df matVewProj = renderCam.GetViewProjMatrix();
@@ -1234,7 +1234,7 @@ void CTerrain::RenderWater()
 	SVector3Df v3CamPos = pCamera->GetPosition();
 
 	// Water Rendering
-	CShader* pWaterShader = m_pOwnerTerrainMap->GetWaterShaderPtr();
+	CShader* pWaterShader = CResourcesManager::Instance().GetShader("MapWater");
 
 	pWaterShader->Use();
 	pWaterShader->setMat4("ViewProjectionMatrix", matVewProj);

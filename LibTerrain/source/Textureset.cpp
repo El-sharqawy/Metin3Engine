@@ -4,7 +4,7 @@
 
 CTerrainTextureset::CTerrainTextureset()
 {
-	Create();
+	//Create();
 }
 
 CTerrainTextureset::~CTerrainTextureset()
@@ -28,8 +28,6 @@ void CTerrainTextureset::Create()
 	m_tErrorTexture.m_pTexture->Load(true);
 	m_tErrorTexture.m_pTexture->MakeResident();
 	m_tErrorTexture.m_uiTextureID = m_tErrorTexture.m_pTexture->GetTextureID();
-
-	m_fTerrainTexCoordBase = 1.0f / static_cast<GLfloat>(PATCH_XSIZE * CELL_SCALE_METER);
 
 	AddEmptyTexture();
 }

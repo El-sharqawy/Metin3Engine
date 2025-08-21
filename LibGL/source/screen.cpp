@@ -699,10 +699,12 @@ void CScreen::RenderTerrainEditingArea()
 
 	fY = pOutdoor.GetHeight(fX, fZ) + 0.1f;
 
-	pOutdoor.GetTerrainShaderRef().Use();
-	pOutdoor.GetTerrainShaderRef().setVec3("u_HitPosition", fX, fY, fZ);
-	pOutdoor.GetTerrainShaderRef().setInt("u_HitRadius", iBrushSize);
-	pOutdoor.GetTerrainShaderRef().setBool("u_HasHit", true);				// enable hit visualization
+	CShader* pShader = CResourcesManager::Instance().GetShader("TessellatedMapTerrain");
+
+	pShader->Use();
+	pShader->setVec3("u_HitPosition", fX, fY, fZ);
+	pShader->setInt("u_HitRadius", iBrushSize);
+	pShader->setBool("u_HasHit", true);				// enable hit visualization
 
 	fLeft = static_cast<GLfloat>((iEditX - iBrushSize) * CELL_SCALE_METER + iEditTerrainNumX * TERRAIN_XSIZE);
 	fRight = static_cast<GLfloat>((iEditX + iBrushSize) * CELL_SCALE_METER + iEditTerrainNumX * TERRAIN_XSIZE);

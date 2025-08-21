@@ -57,9 +57,11 @@ bool CTerrainManager::CreateNewMap()
 	create_directory_if_missing(m_strNewMapName);
 
 	CTerrainMap* pNewMap = new CTerrainMap;
-	pNewMap->SetTerrainsCount(m_iNewMapSizeX, m_iNewMapSizeZ);
+
+	/*pNewMap->SetTerrainsCount(m_iNewMapSizeX, m_iNewMapSizeZ);
 	pNewMap->SetMapName(m_strNewMapName);
 
+	
 	if (!pNewMap->SaveSettingsFile(m_strNewMapName))
 	{
 		sys_err("CTerrainManager::CreateNewMap: Failed to Save Settins File!");
@@ -72,6 +74,7 @@ bool CTerrainManager::CreateNewMap()
 		return (false);
 	}
 
+	
 	for (GLint iTerrainZ = 0; iTerrainZ < m_iNewMapSizeZ; iTerrainZ++)
 	{
 		for (GLint iTerrainX = 0; iTerrainX < m_iNewMapSizeX; iTerrainX++)
@@ -84,9 +87,10 @@ bool CTerrainManager::CreateNewMap()
 		}
 	}
 
-	sys_log("CTerrainManager::CreateNewMap: Map %s Created Successfully with size (%d, %d)", m_strNewMapName.c_str(), m_iNewMapSizeX, m_iNewMapSizeZ);
+	glCheckError();
 
-	safe_delete(pNewMap);
+	sys_log("CTerrainManager::CreateNewMap: Map %s Created Successfully with size (%d, %d)", m_strNewMapName.c_str(), m_iNewMapSizeX, m_iNewMapSizeZ);
+	safe_delete(pNewMap);*/
 	return (true);
 }
 

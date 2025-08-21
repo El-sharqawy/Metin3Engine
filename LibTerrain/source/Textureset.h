@@ -54,5 +54,4 @@ private:
 	TTexturesVector m_vTextures;
 	TTerrainTexture m_tErrorTexture;
 	std::string m_stFileName;
-	GLfloat m_fTerrainTexCoordBase;
 };

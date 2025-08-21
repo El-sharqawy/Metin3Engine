@@ -84,6 +84,7 @@ bool CTexture::Load(bool bBindless)
 		LoadInternal(m_bImageData);
 	}
 
+	glBindTexture(GL_TEXTURE_2D, 0);
 	return true;
 }
 
@@ -92,6 +93,8 @@ void CTexture::Load(GLuint uiBufferSize, void* pImageData)
 	void* pImageLoadedData = stbi_load_from_memory((const stbi_uc*)pImageData, uiBufferSize, &m_iWidth, &m_iHeight, &m_iChannelsBPP, 0);
 	LoadInternal(pImageLoadedData);
 	stbi_image_free(pImageLoadedData);
+
+	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 bool CTexture::Load(const std::string& stFileName, bool bBindless)
@@ -145,6 +148,8 @@ void CTexture::LoadF32(GLint iWidth, GLint iHeight, float* pImageData)
 	glTextureParameteri(m_uiTextureID, GL_TEXTURE_WRAP_S, GL_REPEAT);
 	glTextureParameteri(m_uiTextureID, GL_TEXTURE_WRAP_T, GL_REPEAT);
 	glGenerateTextureMipmap(m_uiTextureID);
+
+	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 void CTexture::Bind(GLenum eTextureUnit)
@@ -270,6 +275,8 @@ void CTexture::LoadInternalDSA(void* pImageData)
 	glTextureParameteri(m_uiTextureID, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
 	glGenerateTextureMipmap(m_uiTextureID);
+
+	glBindTexture(m_eTextureTarget, 0);
 }
 
 void CTexture::LoadInternalNonDSA(void* pImageData)
@@ -357,6 +364,8 @@ GLuint CTexture::GenerateTexture2D(GLint iWidth, GLint iHeight)
 
 	glBindImageTexture(0, m_uiTextureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 
+	glBindTexture(m_eTextureTarget, 0);
+
 	return (m_uiTextureID);
 }
 
@@ -384,6 +393,7 @@ GLuint CTexture::GenerateEmptyTexture2D(GLint iWidth, GLint iHeight, GLint iText
 	glTexParameteri(m_eTextureTarget, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(m_eTextureTarget, GL_TEXTURE_WRAP_S, GL_REPEAT);
 	glTexParameteri(m_eTextureTarget, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
 	glBindTexture(m_eTextureTarget, 0);
 
 	return m_uiTextureID;
@@ -467,6 +477,8 @@ GLuint CTexture::GenerateTexture3D(GLint iWidth, GLint iHeight, GLint iDepth)
 
 	glBindImageTexture(0, m_uiTextureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
 
+	glBindTexture(m_eTextureTarget, 0);
+
 	return (m_uiTextureID);
 }
 
@@ -534,6 +546,7 @@ GLuint CTexture::GenerateAlphaTexture(const std::vector<std::vector<GLubyte>> &v
 		glBindTexture(GL_TEXTURE_2D, 0);
 	}
 
+	glBindTexture(m_eTextureTarget, 0);
 	return m_uiTextureID;
 }
 
@@ -635,6 +648,8 @@ void CTexture::CreateBindlessTextureDSA(void* pImageData)
 	GLfloat maxAniso = 0.0f;
 	glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &maxAniso);
 	glTextureParameterf(m_uiTextureID, GL_TEXTURE_MAX_ANISOTROPY, maxAniso);
+
+	glBindTexture(m_eTextureTarget, 0);
 }
 
 void CTexture::UploadFloatRGBA(const SVector4Df* data)

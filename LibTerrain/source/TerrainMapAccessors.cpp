@@ -246,26 +246,6 @@ GLfloat CTerrainMap::GetWaterHeight(GLfloat fX, GLfloat fZ)
 	return pTerrain->GetWaterHeight(iLocalX, iLocalZ);
 }
 
-CShader& CTerrainMap::GetTerrainShaderRef()
-{
-	return (*m_pMapShader);
-}
-
-CShader* CTerrainMap::GetTerrainShaderPtr()
-{
-	return (m_pMapShader);
-}
-
-CShader& CTerrainMap::GetWaterShaderRef()
-{
-	return (*m_pMapWaterShader);
-}
-
-CShader* CTerrainMap::GetWaterShaderPtr()
-{
-	return (m_pMapWaterShader);
-}
-
 bool CTerrainMap::IsAttributeOn(GLint iX, GLint iZ, GLubyte ubAttr)
 {
 	if (iX < 0 || iZ < 0 || iX >= m_iTerrainCountX * TERRAIN_XSIZE || iZ >= m_iTerrainCountZ * TERRAIN_ZSIZE)
@@ -381,7 +361,10 @@ bool CTerrainMap::CreateTexturesetFile(const std::string& stMapName)
 bool CTerrainMap::CreateTerrainFiles(GLint iTerrCoordX, GLint iTerrCoordZ)
 {
 	CTerrain* pTerrainMap = new CTerrain;
+	CTerrainAreaData* pAreaData = new CTerrainAreaData;
+
 	pTerrainMap->SetTerrainCoords(iTerrCoordX, iTerrCoordZ);
+	pAreaData->SetAreaCoords(iTerrCoordX, iTerrCoordZ);
 
 	char szTerrainFolder[256] = {};
 	GLint iID = iTerrCoordX * 1000 + iTerrCoordZ;
@@ -393,6 +376,7 @@ bool CTerrainMap::CreateTerrainFiles(GLint iTerrCoordX, GLint iTerrCoordZ)
 	if (!pTerrainMap->NewTerrainProperties(m_strMapName))
 	{
 		sys_err("CTerrainMap::CreateTerrainFiles: Failed to Create Property File for Map: %s with coords(%d, %d)", m_strMapName.c_str(), iTerrCoordX, iTerrCoordZ);
+		safe_delete(pTerrainMap);
 		return (false);
 	}
 
@@ -400,6 +384,7 @@ bool CTerrainMap::CreateTerrainFiles(GLint iTerrCoordX, GLint iTerrCoordZ)
 	if (!pTerrainMap->NewHeightMap(m_strMapName))
 	{
 		sys_err("CTerrainMap::CreateTerrainFiles: Failed to Create HeightMap for Map: %s with coords(%d, %d)", m_strMapName.c_str(), iTerrCoordX, iTerrCoordZ);
+		safe_delete(pTerrainMap);
 		return (false);
 	}
 
@@ -407,6 +392,7 @@ bool CTerrainMap::CreateTerrainFiles(GLint iTerrCoordX, GLint iTerrCoordZ)
 	if (!pTerrainMap->NewAttributeMap(m_strMapName))
 	{
 		sys_err("CTerrainMap::CreateTerrainFiles: Failed to Create AttributeMap for Map: %s with coords(%d, %d)", m_strMapName.c_str(), iTerrCoordX, iTerrCoordZ);
+		safe_delete(pTerrainMap);
 		return (false);
 	}
 
@@ -414,6 +400,7 @@ bool CTerrainMap::CreateTerrainFiles(GLint iTerrCoordX, GLint iTerrCoordZ)
 	if (!pTerrainMap->NewSplatMap(m_strMapName))
 	{
 		sys_err("CTerrainMap::CreateTerrainFiles: Failed to Create Splatmap for Map: %s with coords(%d, %d)", m_strMapName.c_str(), iTerrCoordX, iTerrCoordZ);
+		safe_delete(pTerrainMap);
 		return (false);
 	}
 
@@ -421,10 +408,21 @@ bool CTerrainMap::CreateTerrainFiles(GLint iTerrCoordX, GLint iTerrCoordZ)
 	if (!pTerrainMap->NewWaterMap(m_strMapName))
 	{
 		sys_err("CTerrainMap::CreateTerrainFiles: Failed to Create WaterMap for Map: %s with coords(%d, %d)", m_strMapName.c_str(), iTerrCoordX, iTerrCoordZ);
+		safe_delete(pTerrainMap);
+		return (false);
+	}
+
+	// Create Area Objects Data
+	if (!pAreaData->SaveAreaObjectsFromFile(m_strMapName))
+	{
+		sys_err("CTerrainMap::CreateTerrainFiles: Failed to Create Area Objects Data for Map: %s with coords(%d, %d)", m_strMapName.c_str(), iTerrCoordX, iTerrCoordZ);
+		safe_delete(pAreaData);
 		return (false);
 	}
 
 	safe_delete(pTerrainMap);
+	safe_delete(pAreaData);
+
 	return (true);
 }
 
@@ -564,7 +562,7 @@ bool CTerrainMap::SaveAreas()
 
 bool CTerrainMap::GetPickingCoordinate(SVector3Df* v3IntersectPt, GLint* iCellX, GLint* iCellZ, GLint* iSubCellX, GLint* iSubCellZ, GLint* iTerrainNumX, GLint* iTerrainNumZ)
 {
-	return GetPickingCoordinateWithRay(ms_Ray, v3IntersectPt, iCellX, iCellZ, iSubCellX, iSubCellZ, iTerrainNumX, iTerrainNumZ);
+	return GetPickingCoordinateWithRay(CScreen::GetCRay(), v3IntersectPt, iCellX, iCellZ, iSubCellX, iSubCellZ, iTerrainNumX, iTerrainNumZ);
 }
 
 bool CTerrainMap::GetPickingCoordinateWithRay(const CRay& rRay, SVector3Df* v3IntersectPt, GLint* iCellX, GLint* iCellZ, GLint* iSubCellX, GLint* iSubCellZ, GLint* iTerrainNumX, GLint* iTerrainNumZ)

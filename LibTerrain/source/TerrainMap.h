@@ -21,7 +21,7 @@ typedef struct SOutdoorMapCoordinate
 	GLint m_iTerrainCoordZ;
 } TOutdoorMapCoordinate;
 
-class CTerrainMap : public CScreen
+class CTerrainMap
 {
 public:
 	CTerrainMap();
@@ -66,15 +66,10 @@ public:
 
 	GLfloat GetWaterHeight(GLfloat fX, GLfloat fZ);
 
-	CShader& GetTerrainShaderRef();
-	CShader* GetTerrainShaderPtr();
-
 	bool IsAttributeOn(GLint iX, GLint iZ, GLubyte ubAttr);
 	void GetAttribute(GLint iX, GLint iZ, GLubyte* pubAttr);
 
 	// Water Data Getters
-	CShader& GetWaterShaderRef();
-	CShader* GetWaterShaderPtr();
 	CTexture* GetWaterDudvTexPtr();
 	CTexture* GetWaterNormalTexPtr();
 	CTexture& GetWaterDudvTexRef();
@@ -86,7 +81,6 @@ public:
 	CFrameBuffer& GetRefractionFBORef();
 
 protected:
-	void InitializeMapShaders();
 	void InitializeMapWaterData();
 
 	bool LoadSettings(const std::string& stSettingsFile);
@@ -141,13 +135,6 @@ protected:
 	bool m_bReady;
 
 protected:
-	// Terrain Variables
-	CShader* m_pMapShader;
-	// Water Shader
-	CShader* m_pMapWaterShader;
-	// Objects Shader
-	CShader* m_pMapObjectsShader;
-
 	// Number of Terrains within the seamless map
 	GLint m_iTerrainCountX;
 	GLint m_iTerrainCountZ;

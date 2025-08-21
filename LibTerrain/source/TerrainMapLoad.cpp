@@ -16,7 +16,6 @@ bool CTerrainMap::LoadMap(const SVector3Df& v3PlayerPos)
 	CTerrainWaterVAO::Initialize();
 
 	// SetMap Name First
-	InitializeMapShaders();
 	InitializeMapWaterData();
 
 	std::string strSettingsFile = GetMapDirectoy() + "\\map_settings.json";
@@ -35,57 +34,8 @@ bool CTerrainMap::LoadMap(const SVector3Df& v3PlayerPos)
 	return (true);
 }
 
-void CTerrainMap::InitializeMapShaders()
-{
-	if (!m_pMapShader)
-	{
-		try
-		{
-			m_pMapShader = CResourcesManager::Instance().GetShader("TessellatedMapTerrain");
-		}
-		catch (const std::exception& err)
-		{
-			sys_err("CTerrainMap::InitializeMapShaders: Failed to fetch Map Shader from Resources Manager Err: %s", err.what());
-
-			char c_szShaderName[256] = "Map Shader";
-			if (!GetMapName().empty())
-			{
-				sprintf_s(c_szShaderName, "%s Shader", GetMapName().c_str());
-			}
-			m_pMapShader = new CShader(c_szShaderName);
-			m_pMapShader->AttachShader("shaders/map_shader.vert");
-			m_pMapShader->AttachShader("shaders/map_shader.tcs");
-			m_pMapShader->AttachShader("shaders/map_shader.tes");
-			m_pMapShader->AttachShader("shaders/map_shader.frag");
-			m_pMapShader->LinkPrograms();
-		}
-	}
-}
-
 void CTerrainMap::InitializeMapWaterData()
 {
-	if (!m_pMapWaterShader)
-	{
-		try
-		{
-			m_pMapWaterShader = CResourcesManager::Instance().GetShader("MapWater");
-		}
-		catch (const std::exception& err)
-		{
-			sys_err("CTerrainMap::InitializeMapWaterData: Failed to fetch Map Water Shader from Resources Manager Err: %s", err.what());
-
-			char c_szWaterShaderName[256] = "Map Water Shader";
-			if (!GetMapName().empty())
-			{
-				sprintf_s(c_szWaterShaderName, "%s Water Shader", GetMapName().c_str());
-			}
-			m_pMapWaterShader = new CShader(c_szWaterShaderName);
-			m_pMapWaterShader->AttachShader("shaders/map_water_shader.vert");
-			m_pMapWaterShader->AttachShader("shaders/map_water_shader.frag");
-			m_pMapWaterShader->LinkPrograms();
-		}
-	}
-
 	m_pWaterDudvTex = new CTexture("resources/textures/waterDUDVMap.png", GL_TEXTURE_2D);
 	m_pWaterDudvTex->Load();
 	m_pWaterDudvTex->SetWrapping(GL_REPEAT, GL_REPEAT);
