@@ -21,7 +21,7 @@ int main(int argc, char* argv[])
 	std::unique_ptr<CWindow> app = std::make_unique<CWindow>();
 	if (!app->InitializeWindow("Terrain Engine", DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT))
 	{
-		sys_err("CTerrainEngine: Failed to Create the Application Window");
+		sys_err("CMain: Failed to Create the Application Window");
 		return (EXIT_FAILURE);
 	}
 

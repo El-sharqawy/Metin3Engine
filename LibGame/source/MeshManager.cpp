@@ -603,7 +603,7 @@ void CMeshManager::RenderMeshEditorUI(CTerrainManager* pTerrainManager)
 
 				// Define your base directory. This is the part your want to remove.
 				// In this case, it's the root of our project.
-				std::filesystem::path baseDir = "G:/Projects/TerrainEngine/UserInterface/";
+				std::filesystem::path baseDir = "G:/Projects/Metin3Engine/UserInterface/";
 
 				// Create filesystem path objects for easier manipulation
 				std::filesystem::path fullPath(filePathName);

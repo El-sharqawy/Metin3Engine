@@ -642,7 +642,7 @@ void CWindow::UpdateAndRenderText()
 	std::string stColor = "[COL=1.0,0.5,0.0,1.0]";
 	sprintf_s(c_szPlayerPosition, "Camera Position: %s (%.2f, %.2f, %.2f)", stColor.c_str(), v3PlayerPos.x, v3PlayerPos.y, v3PlayerPos.z);
 
-	// CFontManager::Instance().RenderText("[COL=0.2,0.3,1.0,1.0]TerrainEngine", "AmiriRegular", 50, 30, SVector2Di(GetWidth(), GetHeight()), EAlignment::ALIGN_TOP_LEFT, 1.0f, 0, true);
+	// CFontManager::Instance().RenderText("[COL=0.2,0.3,1.0,1.0]Metin3 Engine", "AmiriRegular", 50, 30, SVector2Di(GetWidth(), GetHeight()), EAlignment::ALIGN_TOP_LEFT, 1.0f, 0, true);
 	// CFontManager::Instance().RenderText(c_szPlayerPosition, "AmiriRegular", 50, 80, SVector2Di(GetWidth(), GetHeight()), EAlignment::ALIGN_TOP_LEFT, 1.0f, 0, true);
 
 	m_pFrameBufObj->UnBindWriting();
